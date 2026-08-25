@@ -200,3 +200,122 @@ describe("HP4 · 선행 스냅샷 정책(9083c2bd)", () => {
     expect(plan.candidates.map((s) => s.id)).toEqual(["1"]);
   });
 });
+
+describe("HP4 최종 · apply 시도 영구 기록", () => {
+  const stagingVerified = {
+    id: "11111111-2222-3333-4444-555555555555",
+    status: "staging_verified",
+    requested_scope: "abd",
+    staging_overall_digest: "d1",
+    safety_snapshot_id: "s1",
+  };
+  const input = {
+    confirmation: buildRestoreConfirmation("abd", stagingVerified.id),
+    expected_overall_digest: "d1",
+  };
+
+  it("11. apply claim 은 1회만 성공한다", () => {
+    // 1회차: 요청 기록 없음 → 허용
+    expect(() => assertApplyAllowed(stagingVerified, input)).not.toThrow();
+    // 2회차: 통신 오류 후에도 apply_requested_at 이 남아 재시도 차단
+    expect(() =>
+      assertApplyAllowed({ ...stagingVerified, apply_requested_at: "2026-08-25T00:00:00Z" }, input),
+    ).toThrow("RESTORE_APPLY_ALREADY_REQUESTED");
+  });
+
+  it("12. staging_verified + apply_requested_at 은 미확정으로 판정한다", () => {
+    const v = view({
+      status: "staging_verified",
+      staging_overall_digest: "d1",
+      safety_snapshot_id: "s1",
+      apply_requested_at: "2026-08-25T00:00:00Z",
+      apply_attempted: true,
+    });
+    const st = deriveWizardState(v, { recheckedInSession: true });
+    expect(st.resultKind).toBe("unknown");
+    expect(st.unresolved).toBe(true);
+    expect(st.allowApply).toBe(false);
+    expect(canStartNewRun(v)).toBe(false);
+  });
+
+  it("13. success / apply_failed 만 최종 상태로 표시한다", () => {
+    expect(
+      deriveWizardState(view({ status: "success", apply_attempted: true, apply_requested_at: "t" })).resultKind,
+    ).toBe("success");
+    expect(
+      deriveWizardState(
+        view({ status: "apply_failed", error_code: "E1", apply_attempted: true, apply_requested_at: "t" }),
+      ).resultKind,
+    ).toBe("rollback");
+  });
+});
+
+describe("HP4 최종 · 보관정책 분리", () => {
+  it("14. 다수의 최신 pre-import Snapshot 이 일반 최소보관 계산을 바꾸지 않는다", () => {
+    const now = Date.parse("2026-09-01T00:00:00Z");
+    const at = (d: number) => new Date(now - d * 86400000).toISOString();
+    const regular = [
+      { id: "r1", created_at: at(40), size_bytes: 1 },
+      { id: "r2", created_at: at(39), size_bytes: 1 },
+      { id: "r3", created_at: at(38), size_bytes: 1 },
+      { id: "r4", created_at: at(1), size_bytes: 1 },
+    ];
+    const preImports = Array.from({ length: 10 }, (_, i) => ({
+      id: `p${i}`,
+      created_at: at(0),
+      size_bytes: 1,
+      triggered_by: "pre-import",
+    }));
+    const mixed = [...regular, ...preImports];
+    const opts = { retentionDays: 30, keepMinimum: 3, now };
+    // 정본 계약: 일반·정기 계산에는 pre-import 를 넣지 않는다.
+    const onlyRegular = planRetentionCleanup(
+      mixed.filter((s: any) => s.triggered_by !== "pre-import"),
+      opts,
+    );
+    expect(onlyRegular.candidates.map((s) => s.id)).toEqual(["r1"]);
+    expect(planPreImportCleanup(mixed, { now }).candidates).toEqual([]);
+  });
+
+  it("15. 자동·큐 Snapshot 경로에서 cleanup 을 await 하고 실패해도 성공을 뒤집지 않는다", async () => {
+    const fs = await import("node:fs/promises");
+    for (const f of [
+      "src/routes/api/public/backup/auto-snapshot.ts",
+      "src/routes/api/public/backup/run-queued-snapshot.ts",
+    ]) {
+      const src = await fs.readFile(f, "utf8");
+      expect(src).toMatch(/await core\.cleanupOldSnapshots\(supabaseAdmin\)/);
+      expect(src).not.toMatch(/core\.cleanupOldSnapshots\(supabaseAdmin\)\.catch/);
+      expect(src).toMatch(/cleanup_failed/);
+    }
+  });
+});
+
+describe("HP4 최종 · 새로고침 dependency 복원", () => {
+  it("16. 새로고침 전후 대상 표·자동 포함 표·예상 행수가 동일하다", async () => {
+    const { hydrateWizardPreflight } = await import("../safe-restore-ui");
+    const before = {
+      preflight: {
+        dependency: {
+          final_restore_tables: ["abd_items_raw", "abd_comments"],
+          auto_included_tables: ["abd_comments"],
+          keep_current_parent_tables: ["profiles"],
+          required_parent_tables: ["profiles"],
+        },
+        expected_rows: { abd_items_raw: 12 },
+      },
+    };
+    const serverStatus = {
+      run_id: "r",
+      final_restore_tables: before.preflight.dependency.final_restore_tables,
+      auto_included_tables: before.preflight.dependency.auto_included_tables,
+      keep_current_parent_tables: before.preflight.dependency.keep_current_parent_tables,
+      required_parent_tables: before.preflight.dependency.required_parent_tables,
+      expected_rows: before.preflight.expected_rows,
+      preflight_summary: { blockers: [], warnings: [] },
+    };
+    const after = hydrateWizardPreflight(serverStatus);
+    expect(after.preflight.dependency).toEqual(before.preflight.dependency);
+    expect(after.preflight.expected_rows).toEqual(before.preflight.expected_rows);
+  });
+});
