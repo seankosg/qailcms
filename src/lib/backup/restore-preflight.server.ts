@@ -820,17 +820,27 @@ export async function stageRestoreRun(
     return { run_id: runId, staged_rows: staged, status };
   } catch (err) {
     // 실패해도 preflight_result 는 절대 덮어쓰지 않는다.
-    await admin
+    const message = (err as Error).message;
+    const { error: logError } = await admin
       .from("restore_runs")
       .update({
         status: "failed",
         finished_at: new Date().toISOString(),
         error_code: "STAGING_FAILED",
-        error_message: (err as Error).message,
+        error_message: message,
       } as any)
       .eq("id", runId);
+    if (logError) {
+      // 감사기록 갱신 실패는 조용히 넘기지 않는다. 원래 오류와 함께 표면화한다.
+      const combined = new Error(
+        `STAGING_FAILED_AND_AUDIT_UPDATE_FAILED: 준비 영역 적재 실패(${message}) / 실패 기록 갱신도 실패(${logError.message})`,
+      );
+      (combined as Error & { cause?: unknown }).cause = err;
+      throw combined;
+    }
     throw err;
   }
+
 }
 
 export async function verifyRestoreStaging(admin: SupabaseClient<Database>, runId: string) {
