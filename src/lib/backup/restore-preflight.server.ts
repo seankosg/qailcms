@@ -600,7 +600,10 @@ export async function runRestorePreflight(
     scope: String(opts.scope),
     dependency,
     expected_rows: expectedRows,
+    manifest_sha256: manifestSha256,
+    part_contract: partContract,
     parts,
+
     hashes: {
       manifest_overall: manifest?.sha256 ?? null,
       recomputed_overall: recomputedOverall,
