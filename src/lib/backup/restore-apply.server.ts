@@ -210,7 +210,7 @@ export async function createAndBindSafetySnapshot(
 export async function applyRestoreAtomic(
   admin: Admin,
   opts: { runId: string; expectedOverallDigest: string; actorId?: string | null },
-): Promise<ApplyResult> {
+): Promise<ApplyOutcome> {
   if (!opts.expectedOverallDigest) throw new Error("RESTORE_STAGING_DIGEST_REQUIRED");
 
   const { data: run, error: runError } = await admin
