@@ -176,6 +176,7 @@ export async function runRestorePreflight(
   // ── 1) Storage manifest.json 을 사전검증 정본으로 로드 ────────────────────
   let manifest: SnapshotManifest | null = null;
   let manifestSource: "storage" | "none" = "none";
+  let manifestSha256: string | null = null;
   const manifestPath = `${folder.endsWith("/") ? folder : `${folder}/`}manifest.json`;
   const { data: mBlob, error: mErr } = await admin.storage.from(BUCKET).download(manifestPath);
   if (mErr || !mBlob) {
@@ -185,8 +186,10 @@ export async function runRestorePreflight(
       detail: { path: manifestPath, error: mErr?.message ?? null },
     });
   } else {
+    const manifestBytes = new Uint8Array(await mBlob.arrayBuffer());
+    manifestSha256 = await sha256Hex(manifestBytes);
     try {
-      manifest = JSON.parse(new TextDecoder().decode(new Uint8Array(await mBlob.arrayBuffer()))) as SnapshotManifest;
+      manifest = JSON.parse(new TextDecoder().decode(manifestBytes)) as SnapshotManifest;
       manifestSource = "storage";
     } catch (err) {
       blockers.push({
@@ -196,6 +199,7 @@ export async function runRestorePreflight(
       });
     }
   }
+
 
   if (manifest) {
     if (String(manifest.id ?? "") !== String(snapshot.id)) {
