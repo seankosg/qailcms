@@ -445,6 +445,19 @@ export async function createSnapshot(
   }
 
   const overallHash = await overallHasher.digest();
+
+  // v2 스키마 계약: 복원 시점에 컬럼/PK/FK 가 바뀌었는지 대조할 수 있도록 지문을 함께 남긴다.
+  const { data: contract, error: contractError } = await (supabaseAdmin as any).rpc(
+    "backup_table_schema_contract",
+    { _tables: tablesToBackup },
+  );
+  if (contractError) throw new Error(`스키마 계약 산출 실패: ${contractError.message}`);
+  const { data: fingerprint, error: fingerprintError } = await (supabaseAdmin as any).rpc(
+    "backup_schema_fingerprint",
+    { _tables: tablesToBackup },
+  );
+  if (fingerprintError) throw new Error(`스키마 지문 산출 실패: ${fingerprintError.message}`);
+
   const manifest: SnapshotManifest = {
     id: snapshotId,
     name,
@@ -454,7 +467,11 @@ export async function createSnapshot(
     tables: tableManifests,
     total_rows: totalRows,
     sha256: overallHash,
+    schema_version: SNAPSHOT_SCHEMA_VERSION,
+    schema_fingerprint: (fingerprint as string | null) ?? undefined,
+    schema_contract: contract ?? null,
   };
+
 
   const manifestJson = JSON.stringify(manifest);
   const manifestBytes = new TextEncoder().encode(manifestJson);
