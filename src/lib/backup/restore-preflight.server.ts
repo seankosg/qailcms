@@ -29,6 +29,24 @@ export type PreflightIssue = {
   detail?: { [key: string]: JsonValue };
 };
 
+/**
+ * 사전검증이 실측으로 확정한 파트 계약.
+ * staging 은 재다운로드한 manifest 가 아니라 이 계약만을 기준으로 검증·적재한다.
+ */
+export type PartContract = {
+  table: string;
+  part_index: number;
+  /** manifest 원문 상대경로 */
+  path: string;
+  /** 검증된 정규 전체 경로(Storage 호출에 사용) */
+  full_path: string;
+  rows: number;
+  size_bytes: number;
+  sha256: string;
+};
+
+
+
 export type RestoreDependency = {
   requested_tables: string[];
   dependent_tables: string[];
