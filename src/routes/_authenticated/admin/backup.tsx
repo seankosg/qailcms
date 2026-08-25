@@ -32,7 +32,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Progress } from "@/components/ui/progress";
 import { DatabaseBackup, Download, RotateCcw, Trash2, Lock, Unlock, CalendarClock, Play, AlertTriangle, Loader2, HardDrive, Images, ShieldCheck } from "lucide-react";
-import { BACKUP_TABLES, type BackupTableName } from "@/lib/backup/backup-shared";
+import { BACKUP_TABLES } from "@/lib/backup/backup-shared";
 import { formatDateTime } from "@/lib/utils";
 
 export const Route = createFileRoute("/_authenticated/admin/backup")({
