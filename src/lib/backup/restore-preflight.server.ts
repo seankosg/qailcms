@@ -718,17 +718,24 @@ export async function stageRestoreRun(
 
   if (runError) throw new Error(runError.message);
   if (!run) throw new Error("복원 준비 작업을 찾을 수 없습니다.");
-  if (run.status !== "preflight_clean") {
+
+  // 동시 요청 방어: 상태 판정은 SELECT→UPDATE 가 아니라 원자적 claim RPC 가 정본이다.
+  // claim 에 실패하면 준비 영역을 비우지도, 파일을 내려받지도 않는다.
+  const { data: claimRaw, error: claimError } = await (admin as any).rpc("restore_claim_staging", {
+    _run_id: runId,
+  });
+  if (claimError) throw new Error(`준비 영역 점유 실패: ${claimError.message}`);
+  const claim = (claimRaw ?? {}) as { claimed?: boolean; status?: string | null; reason?: string | null };
+  if (!claim.claimed) {
+    if (claim.reason === "RESTORE_STAGING_ALREADY_IN_PROGRESS") {
+      throw new Error(
+        `RESTORE_STAGING_ALREADY_IN_PROGRESS: 이 복원 준비 작업은 이미 진행 중입니다(현재 상태: ${claim.status}).`,
+      );
+    }
     throw new Error(
-      `사전검증을 통과한 작업만 준비 영역에 적재할 수 있습니다. 현재 상태: ${run.status}`,
+      `RESTORE_STAGING_NOT_CLAIMABLE: 사전검증을 통과한 작업만 준비 영역에 적재할 수 있습니다. 현재 상태: ${claim.status ?? run.status}`,
     );
   }
-
-  const { error: statusError } = await admin
-    .from("restore_runs")
-    .update({ status: "staging" })
-    .eq("id", runId);
-  if (statusError) throw new Error(`상태 갱신 실패: ${statusError.message}`);
 
   // 재시도 안전성: 같은 작업의 기존 준비 데이터를 먼저 비운다(준비 영역 한정).
   const { error: clearError } = await admin
