@@ -253,9 +253,7 @@ export const MODULE_PRE_IMPORT_TABLES: Record<PreImportModule, BackupTableName[]
     "spl_document_pages",
     "spl_ocs_comment_document_links",
   ],
-  wrt: ["wrt_items", "wrt_stage_progress", "wrt_change_log", "wrt_items"].filter(
-    (t, i, a) => a.indexOf(t) === i,
-  ) as BackupTableName[],
+  wrt: ["wrt_items", "wrt_stage_progress", "wrt_change_log", "wrt_import_logs"],
 };
 
 // ===========================================================================
