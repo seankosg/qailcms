@@ -721,7 +721,7 @@ export async function stageRestoreRun(
 
   // 동시 요청 방어: 상태 판정은 SELECT→UPDATE 가 아니라 원자적 claim RPC 가 정본이다.
   // claim 에 실패하면 준비 영역을 비우지도, 파일을 내려받지도 않는다.
-  const { data: claimRaw, error: claimError } = await (admin as any).rpc("restore_claim_staging", {
+  const { data: claimRaw, error: claimError } = await admin.rpc("restore_claim_staging", {
     _run_id: runId,
   });
   if (claimError) throw new Error(`준비 영역 점유 실패: ${claimError.message}`);
