@@ -39,11 +39,70 @@ export interface ApplyResult {
   overall_digest: string;
 }
 
+/**
+ * 결과 미확정(unknown): 통신 오류·타임아웃·응답 유실 등으로 롤백 여부를 단정할 수 없는 경우.
+ * 이 결과를 받으면 재실행하지 않고 run_id 로 실제 반영 결과를 확인해야 한다.
+ */
+export interface ApplyUnknownOutcome {
+  ok: false;
+  state: "unknown";
+  run_id: string;
+  code: string;
+  message: string;
+  recheck_required: true;
+}
+
+export type ApplyOutcome = ApplyResult | ApplyUnknownOutcome;
+
 type Admin = SupabaseClient<Database>;
 
 function rpcError(prefix: string, message: string): Error {
   return new Error(`${prefix}: ${message}`);
 }
+
+const TRANSPORT_PATTERNS = [
+  /failed to fetch/i,
+  /network/i,
+  /fetch failed/i,
+  /timeout/i,
+  /timed out/i,
+  /aborted/i,
+  /abort/i,
+  /connection (reset|closed|refused|terminated)/i,
+  /econn/i,
+  /socket hang up/i,
+  /unexpected (end of json|token)/i,
+  /gateway/i,
+  /service unavailable/i,
+];
+
+/**
+ * DB 가 명시적으로 반환한 오류(confirmed_rollback)와 통신 계열 미확정(unknown)을 구분한다.
+ * SQLSTATE 또는 구조화된 오류 코드가 있으면 DB 응답으로 본다.
+ */
+export function classifyRpcError(error: {
+  message?: string;
+  code?: string;
+}): "confirmed_rollback" | "unknown" {
+  const message = error?.message ?? "";
+  const code = error?.code ?? "";
+  if (/^[0-9A-Z]{5}$/.test(code)) return "confirmed_rollback";
+  if (TRANSPORT_PATTERNS.some((re) => re.test(message))) return "unknown";
+  if (/^[A-Z][A-Z0-9_]{3,}/.test(message)) return "confirmed_rollback";
+  return "unknown";
+}
+
+function unknownOutcome(runId: string, code: string, message: string): ApplyUnknownOutcome {
+  return {
+    ok: false,
+    state: "unknown",
+    run_id: runId,
+    code,
+    message: `${code}: 반영 결과를 확인할 수 없습니다(run_id=${runId}). 재실행 금지, 결과 확인 필요. 원인: ${message}`,
+    recheck_required: true,
+  };
+}
+
 
 /** 준비 영역 지문을 계산해 restore_runs 에 고정한다(운영 표 미변경). */
 export async function pinStagingDigest(admin: Admin, runId: string): Promise<StagingDigest> {
