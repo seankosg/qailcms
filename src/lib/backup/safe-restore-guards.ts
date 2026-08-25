@@ -12,7 +12,7 @@ export function buildRestoreConfirmation(scope: string, runId: string): string {
 
 /** System Administrator 단독 권한 검사. 실패 시 즉시 throw. */
 export async function assertSystemAdmin(
-  supabase: { rpc: (fn: string, args: Record<string, unknown>) => Promise<{ data: unknown; error: { message: string } | null }> },
+  supabase: { rpc: (fn: any, args: any) => Promise<{ data: any; error: { message: string } | null }> },
   userId: string,
 ) {
   const { data, error } = await supabase.rpc("is_system_admin", { _user_id: userId });
