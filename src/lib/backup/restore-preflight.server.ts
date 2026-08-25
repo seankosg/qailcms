@@ -727,7 +727,7 @@ export async function stageRestoreRun(
     }
 
     // ── (2) 적재는 사전검증이 고정한 계약에만 근거한다 ───────────────────────
-    const contract = (((run as any).preflight_result?.part_contract ?? []) as PartContract[]) ?? [];
+    const contract = ((run as any).preflight_result?.part_contract ?? []) as PartContract[];
     if (!Array.isArray(contract) || contract.length === 0) {
       throw new Error(
         "RESTORE_PART_CONTRACT_MISSING: 사전검증이 고정한 파트 계약이 없습니다. 사전검증을 다시 실행하십시오.",
