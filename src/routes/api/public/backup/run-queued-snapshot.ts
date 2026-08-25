@@ -82,12 +82,21 @@ export const Route = createFileRoute("/api/public/backup/run-queued-snapshot")({
             })
             .eq("id", run.id);
 
-          // Best-effort retention cleanup
-          core.cleanupOldSnapshots(supabaseAdmin).catch((err) => {
-            console.error("Background cleanup failed", err);
-          });
+          // 보관정책 정리는 반드시 완료를 기다린다(serverless 중단 방지).
+          // 정리 실패는 별도로 기록하되 성공한 Snapshot 을 실패로 뒤집지 않는다.
+          let cleanup_error: string | null = null;
+          try {
+            await core.cleanupOldSnapshots(supabaseAdmin);
+          } catch (err) {
+            cleanup_error = (err as Error).message;
+            console.error("Retention cleanup failed", err);
+            await supabaseAdmin
+              .from("backup_run_log")
+              .update({ error_message: `cleanup_failed: ${cleanup_error}` })
+              .eq("id", run.id);
+          }
 
-          return Response.json({ ok: true, snapshot: result });
+          return Response.json({ ok: true, snapshot: result, cleanup_error });
         } catch (err) {
           await supabaseAdmin
             .from("backup_run_log")

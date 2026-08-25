@@ -678,7 +678,9 @@ async function loadRetentionPlan(supabaseAdmin: SupabaseClient<Database>) {
   if (listError) throw new Error(`Failed to list snapshots: ${listError.message}`);
 
   const all = (snapshots ?? []) as any[];
-  const base = planRetentionCleanup(all, {
+  // 일반·정기 보관정책 계산에는 pre-import Snapshot 을 포함하지 않는다.
+  const regular = all.filter((s) => s.triggered_by !== "pre-import");
+  const base = planRetentionCleanup(regular, {
     retentionDays: config?.retention_days ?? 30,
     keepMinimum: config?.keep_minimum_count ?? 3,
   });
