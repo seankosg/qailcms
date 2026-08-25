@@ -173,16 +173,42 @@ export async function applyRestoreAtomic(
     throw new Error("RESTORE_STAGING_DIGEST_MISMATCH");
   }
 
-  const { data, error } = await (admin as any).rpc("restore_apply_atomic", {
-    _run_id: opts.runId,
-    _expected_overall_digest: opts.expectedOverallDigest,
-    _actor: opts.actorId ?? null,
-  });
+  let data: unknown = null;
+  let error: { message?: string; code?: string } | null = null;
+  try {
+    const res = await (admin as any).rpc("restore_apply_atomic", {
+      _run_id: opts.runId,
+      _expected_overall_digest: opts.expectedOverallDigest,
+      _actor: opts.actorId ?? null,
+    });
+    data = res?.data ?? null;
+    error = res?.error ?? null;
+    if (!res || (res.data === undefined && res.error === undefined)) {
+      // 응답 자체가 유실/파싱 불가 → 결과 미확정
+      return unknownOutcome(opts.runId, "RESTORE_APPLY_RESULT_UNKNOWN_NO_RESPONSE", "응답을 확인할 수 없습니다.");
+    }
+  } catch (err) {
+    // 던져진 예외(fetch 실패·중단 등)는 롤백을 단정할 수 없다.
+    return unknownOutcome(
+      opts.runId,
+      "RESTORE_APPLY_RESULT_UNKNOWN_TRANSPORT",
+      (err as Error)?.message ?? "통신 오류",
+    );
+  }
 
   if (error) {
-    // 트랜잭션은 이미 롤백되었다(운영 표 변경 0건). 감사 기록은 별도 문장으로 남긴다.
-    const code = /^[A-Z_]+/.exec(error.message ?? "")?.[0] ?? "RESTORE_APPLY_FAILED";
-    const { error: auditError } = await admin
+    if (classifyRpcError(error) === "unknown") {
+      return unknownOutcome(
+        opts.runId,
+        "RESTORE_APPLY_RESULT_UNKNOWN_TRANSPORT",
+        error.message ?? "통신 오류",
+      );
+    }
+
+    // DB 가 명시적으로 반환한 오류 → 트랜잭션은 롤백되었다(운영 표 변경 0건).
+    // 감사 기록은 별도 문장으로, 그리고 아직 점유되지 않은 상태에서만 남긴다.
+    const code = /^[A-Z][A-Z0-9_]*/.exec(error.message ?? "")?.[0] ?? "RESTORE_APPLY_FAILED";
+    const { error: auditError } = await (admin as any)
       .from("restore_runs")
       .update({
         status: APPLY_STATUS.FAILED,
@@ -190,7 +216,8 @@ export async function applyRestoreAtomic(
         error_code: code,
         error_message: error.message ?? "복원 반영이 실패했습니다.",
       } as any)
-      .eq("id", opts.runId);
+      .eq("id", opts.runId)
+      .eq("status", APPLY_STATUS.READY);
     if (auditError) {
       const combined = new Error(
         `RESTORE_APPLY_FAILED_AND_AUDIT_UPDATE_FAILED: 반영 실패(${error.message}) / 실패 기록 갱신도 실패(${auditError.message})`,
@@ -198,10 +225,11 @@ export async function applyRestoreAtomic(
       (combined as Error & { cause?: unknown }).cause = error;
       throw combined;
     }
-    throw rpcError("RESTORE_APPLY_FAILED", error.message);
+    throw rpcError("RESTORE_APPLY_FAILED", error.message ?? "");
   }
 
   const result = data as ApplyResult;
   if (!result?.ok) throw new Error("RESTORE_APPLY_RESULT_INVALID");
   return result;
+
 }
