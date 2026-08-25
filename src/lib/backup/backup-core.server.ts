@@ -14,7 +14,7 @@ import {
   type MinimalSnapshotClient,
   type SnapshotDeleteResult,
 } from "./storage-purge";
-import { planRetentionCleanup } from "./retention";
+import { planPreImportCleanup, planRetentionCleanup } from "./retention";
 import { combineHashes, sha256Hex } from "./manifest-hash";
 
 export { sha256Hex, combineHashes, normalizePartPath } from "./manifest-hash";
@@ -510,6 +510,8 @@ export async function createSnapshot(
     triggered_by: triggeredBy,
     trigger_metadata: (triggerMetadata ?? null) as any,
     metadata: manifest as any,
+    // 9083c2bd 계약: 모든 신규 Snapshot 은 명시적으로 잠금해제 상태로 생성한다.
+    is_locked: false,
   });
   if (insertError) throw new Error(`Failed to record snapshot: ${insertError.message}`);
 
@@ -671,14 +673,27 @@ async function loadRetentionPlan(supabaseAdmin: SupabaseClient<Database>) {
 
   const { data: snapshots, error: listError } = await supabaseAdmin
     .from("database_snapshots")
-    .select("id, name, created_at, size_bytes, is_locked")
+    .select("id, name, created_at, size_bytes, is_locked, triggered_by")
     .order("created_at", { ascending: true });
   if (listError) throw new Error(`Failed to list snapshots: ${listError.message}`);
 
-  return planRetentionCleanup(snapshots ?? [], {
+  const all = (snapshots ?? []) as any[];
+  const base = planRetentionCleanup(all, {
     retentionDays: config?.retention_days ?? 30,
     keepMinimum: config?.keep_minimum_count ?? 3,
   });
+  // pre-import 24시간 정리는 일반 보관정책과 독립적으로 합산한다(중복 제거).
+  const preImport = planPreImportCleanup(all);
+  const seen = new Set(base.candidates.map((s: any) => s.id));
+  const merged = [...base.candidates];
+  for (const s of preImport.candidates) if (!seen.has(s.id)) merged.push(s as any);
+  return {
+    ...base,
+    candidates: merged,
+    candidate_count: merged.length,
+    estimated_bytes: merged.reduce((n: number, s: any) => n + (s.size_bytes ?? 0), 0),
+    pre_import_cutoff: preImport.cutoff,
+  };
 }
 
 /** 읽기 전용 미리보기 — 실제 실행과 동일한 후보 계산 함수를 사용한다. */

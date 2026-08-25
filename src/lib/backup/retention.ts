@@ -9,7 +9,29 @@ export type RetentionSnapshot = {
   created_at: string;
   size_bytes?: number | null;
   is_locked?: boolean | null;
+  triggered_by?: string | null;
 };
+
+/**
+ * 9083c2bd 계약: 잠금해제된 pre-import Snapshot 은 생성 24시간 후 자동 정리한다.
+ * - 관리자가 잠근 pre-import Snapshot 은 제외한다.
+ * - 일반·정기 Snapshot 의 보관정책(planRetentionCleanup)은 변경하지 않는다.
+ */
+export const PRE_IMPORT_RETENTION_HOURS = 24;
+
+export function planPreImportCleanup<T extends RetentionSnapshot>(
+  snapshots: T[],
+  opts?: { now?: number },
+): { cutoff: string; candidates: T[]; locked_excluded_count: number } {
+  const now = opts?.now ?? Date.now();
+  const cutoff = new Date(now - PRE_IMPORT_RETENTION_HOURS * 60 * 60 * 1000).toISOString();
+  const preImport = snapshots.filter((s) => s.triggered_by === "pre-import");
+  return {
+    cutoff,
+    candidates: preImport.filter((s) => !s.is_locked && s.created_at < cutoff),
+    locked_excluded_count: preImport.filter((s) => !!s.is_locked).length,
+  };
+}
 
 export type RetentionPlan<T extends RetentionSnapshot> = {
   retention_days: number;
