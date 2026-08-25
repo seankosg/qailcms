@@ -240,6 +240,14 @@ export const lockSnapshot = createServerFn({ method: "POST" })
     return { ok: true };
   });
 
+/**
+ * Holding Point 1: 기존(레거시) 복원 실행 경로는 안전성 보완 중이므로 완전 차단한다.
+ * 어떤 운영 데이터도 건드리기 전(트리거 비활성/TRUNCATE/Storage 다운로드 전)에 즉시 중단하며,
+ * restore_run_log 에 성공 기록을 남기지 않는다. 기존 복원 함수/마이그레이션/로그는 그대로 보존한다.
+ */
+export const LEGACY_RESTORE_DISABLED_MESSAGE =
+  "기존 복원 방식은 안전성 보완 중이므로 사용할 수 없습니다. 백업 생성·조회·다운로드는 정상적으로 사용할 수 있습니다.";
+
 export const restoreSnapshot = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input: {
@@ -248,11 +256,17 @@ export const restoreSnapshot = createServerFn({ method: "POST" })
     destructive?: boolean;
   }) => input)
   .handler(async ({ data, context }) => {
+    // === LEGACY_RESTORE_DISABLED — 운영 데이터 변경 전 즉시 차단 ===
+    throw new Error(`LEGACY_RESTORE_DISABLED: ${LEGACY_RESTORE_DISABLED_MESSAGE}`);
+
+    // eslint-disable-next-line no-unreachable
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     await assertAdminOrSuper(context.supabase, context.userId);
     if (data.destructive) {
       await assertAdmin(context.supabase, context.userId);
     }
+
+
 
     const tables = data.tables ?? BACKUP_TABLES;
     const runId = crypto.randomUUID();
