@@ -675,9 +675,12 @@ export async function stageRestoreRun(
 ): Promise<{ run_id: string; staged_rows: Record<string, number>; status: string }> {
   const { data: run, error: runError } = await admin
     .from("restore_runs")
-    .select("id, snapshot_id, final_restore_tables, expected_rows, status")
+    .select(
+      "id, snapshot_id, final_restore_tables, expected_rows, status, manifest_sha256, preflight_result",
+    )
     .eq("id", runId)
     .maybeSingle();
+
   if (runError) throw new Error(runError.message);
   if (!run) throw new Error("복원 준비 작업을 찾을 수 없습니다.");
   if (run.status !== "preflight_clean") {
