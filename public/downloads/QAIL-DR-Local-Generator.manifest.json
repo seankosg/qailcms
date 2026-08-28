@@ -1,8 +1,8 @@
 {
   "name": "QAIL-DR-Local-Generator",
   "generator_version": "1.0.0",
-  "git_commit": "f1aec7c1fddc8ce3a9c82c5ffe4dfeed31a436d2",
-  "git_commit_short": "f1aec7c1fddc",
+  "git_commit": "9af3536a7d01386d75c2ddf10edb92a080b51152",
+  "git_commit_short": "9af3536a7d01",
   "migrations_count": 557,
   "migrations_contract_sha256": "f8cbb675f92cb8be0a99d69f8c49e417d399eb9d84d98309cc4caf4a73478622",
   "bundle_entry": "run.bundle.mjs",
@@ -13,7 +13,7 @@
   "note": "이 파일에는 자격증명이 포함되지 않습니다.",
   "file": "QAIL-DR-Local-Generator.zip",
   "url": "/downloads/QAIL-DR-Local-Generator.zip",
-  "bytes": 1083190,
-  "sha256": "b00d4a88af6427317f13eb776b734decfb9038f774c52e00373b2d2eb7290830",
+  "bytes": 1083192,
+  "sha256": "8109e2f4cf5a15e43bfde1d1cb0b079c66b81ff519a347283975cdfcb502d69c",
   "entry_count": 562
 }
