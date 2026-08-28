@@ -1,24 +1,39 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
-import { HardDriveDownload, CheckCircle2, XCircle, AlertTriangle, Loader2 } from "lucide-react";
+import { HardDriveDownload, CheckCircle2, XCircle, AlertTriangle, Loader2, Download } from "lucide-react";
 import {
   DR_BUCKETS,
   DR_EXCLUDED_BUCKET,
   bytesToHumanDr,
+  clearedVerificationState,
   supportsStreamingSha256,
   verifyDrPackage,
   type DrVerifyResult,
 } from "@/lib/backup/dr-local-verify";
 import { sha256OfBlobStream } from "@/lib/backup/sha256-stream";
 
+const GENERATOR_MANIFEST_URL = "/downloads/QAIL-DR-Local-Generator.manifest.json";
+
+type GeneratorManifest = {
+  file: string;
+  url: string;
+  bytes: number;
+  sha256: string;
+  generator_version: string;
+  git_commit_short: string;
+  migrations_count: number;
+  migrations_contract_sha256: string;
+};
+
 /**
  * 로컬 재해복구 패키지 안내·검증 카드 (System Administrator 전용).
- * 선택한 ZIP·영수증 bytes 는 브라우저 밖으로 나가지 않는다 — 이 컴포넌트에는 fetch/업로드가 없다.
+ * 선택한 ZIP·영수증 bytes 는 브라우저 밖으로 나가지 않는다 — 검증부에는 fetch/업로드가 없다.
+ * (생성기 ZIP 다운로드는 정적 배포 자산 GET 이며 사용자 파일을 전송하지 않는다.)
  */
 export function LocalDrPackageCard() {
   const zipRef = useRef<HTMLInputElement>(null);
@@ -30,8 +45,51 @@ export function LocalDrPackageCard() {
   const [result, setResult] = useState<DrVerifyResult | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
+  const [gen, setGen] = useState<GeneratorManifest | null>(null);
+  const [genError, setGenError] = useState<string | null>(null);
+  const [downloading, setDownloading] = useState(false);
 
   const streamOk = supportsStreamingSha256();
+
+  useEffect(() => {
+    let alive = true;
+    fetch(GENERATOR_MANIFEST_URL)
+      .then((r) => (r.ok ? r.json() : Promise.reject(new Error(`HTTP ${r.status}`))))
+      .then((m) => alive && setGen(m))
+      .catch((e) => alive && setGenError(e?.message ?? String(e)));
+    return () => {
+      alive = false;
+    };
+  }, []);
+
+  /** 파일 선택이 바뀌면 이전 검증 결과·오류·진행률·저장 확인을 즉시 초기화한다. */
+  const resetVerification = () => {
+    const cleared = clearedVerificationState();
+    setResult(cleared.result);
+    setError(cleared.error);
+    setProgress(cleared.progress);
+    setSaved(cleared.saved);
+  };
+
+  const downloadGenerator = async () => {
+    if (!gen) return;
+    setDownloading(true);
+    setGenError(null);
+    try {
+      const res = await fetch(gen.url);
+      if (!res.ok) throw new Error(`다운로드 실패: ${res.status}`);
+      const blob = await res.blob();
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(blob);
+      a.download = gen.file;
+      a.click();
+      URL.revokeObjectURL(a.href);
+    } catch (e: any) {
+      setGenError(e?.message ?? String(e));
+    } finally {
+      setDownloading(false);
+    }
+  };
 
   const runVerify = async () => {
     if (!zipFile || !receiptFile) return;
@@ -53,6 +111,7 @@ export function LocalDrPackageCard() {
 
   const verdict = result?.verdict;
 
+
   return (
     <Card>
       <CardHeader className="flex flex-row items-center gap-2 space-y-0 pb-2">
@@ -69,6 +128,31 @@ export function LocalDrPackageCard() {
           <li>최종 ZIP은 사용자가 선택한 로컬 폴더가 정본입니다. 서버에 보관하지 않습니다.</li>
         </ul>
 
+        <div className="rounded-md border p-3 space-y-2">
+          <div className="font-medium">로컬 생성기 내려받기</div>
+          <p className="text-xs text-muted-foreground">
+            아래 ZIP 하나만 내려받아 압축을 풀면 됩니다. 별도의 설치·저장소 내려받기·npm install 이 필요 없습니다.
+          </p>
+          <Button size="sm" onClick={downloadGenerator} disabled={!gen || downloading}>
+            {downloading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Download className="mr-2 h-4 w-4" />}
+            로컬 생성기 다운로드
+          </Button>
+          {genError ? (
+            <div className="rounded-md border border-amber-500/40 bg-amber-500/10 p-2 text-xs">
+              생성기 정보를 불러오지 못했습니다 — {genError}
+            </div>
+          ) : null}
+          {gen ? (
+            <dl className="grid gap-x-4 gap-y-1 text-xs sm:grid-cols-2">
+              <Row k="파일" v={`${gen.file} (${bytesToHumanDr(gen.bytes)})`} />
+              <Row k="생성기 버전" v={gen.generator_version} />
+              <Row k="Git commit" v={gen.git_commit_short} />
+              <Row k="SHA-256" v={gen.sha256} />
+              <Row k="포함 migration" v={`${gen.migrations_count}건 / ${gen.migrations_contract_sha256.slice(0, 16)}…`} />
+            </dl>
+          ) : null}
+        </div>
+
         <Tabs defaultValue="windows">
           <TabsList>
             <TabsTrigger value="windows">Windows</TabsTrigger>
@@ -77,19 +161,28 @@ export function LocalDrPackageCard() {
           <TabsContent value="windows" className="pt-2">
             <div className="rounded-md border p-3">
               <div className="font-medium">QAIL-재해복구-패키지-생성.cmd</div>
-              <div className="text-xs text-muted-foreground">더블클릭으로 실행합니다.</div>
+              <ol className="mt-1 list-decimal space-y-0.5 pl-5 text-xs text-muted-foreground">
+                <li>내려받은 ZIP을 마우스 오른쪽 → 「압축 풀기」로 폴더에 풉니다.</li>
+                <li>풀린 폴더의 <code>QAIL-재해복구-패키지-생성.cmd</code> 를 더블클릭합니다.</li>
+                <li>보안 경고가 나오면 「추가 정보 → 실행」을 선택합니다.</li>
+              </ol>
             </div>
           </TabsContent>
           <TabsContent value="macos" className="pt-2">
             <div className="rounded-md border p-3">
               <div className="font-medium">QAIL-재해복구-패키지-생성.command</div>
-              <div className="text-xs text-muted-foreground">더블클릭으로 실행합니다.</div>
+              <ol className="mt-1 list-decimal space-y-0.5 pl-5 text-xs text-muted-foreground">
+                <li>내려받은 ZIP을 더블클릭해 압축을 풉니다.</li>
+                <li>풀린 폴더의 <code>QAIL-재해복구-패키지-생성.command</code> 를 더블클릭합니다.</li>
+                <li>실행이 막히면 터미널에서 <code>chmod +x</code> 후 다시 실행하거나, 오른쪽 클릭 → 「열기」를 선택합니다.</li>
+              </ol>
             </div>
           </TabsContent>
         </Tabs>
         <p className="text-xs text-muted-foreground">
-          두 런처는 동일한 공용 엔진을 사용하므로 OS와 무관하게 같은 형식의 패키지가 만들어집니다.
+          두 런처는 동일한 공용 엔진(run.bundle.mjs)을 호출하므로 OS와 무관하게 같은 형식의 패키지가 만들어집니다.
         </p>
+
 
         <div className="grid gap-3 sm:grid-cols-2">
           <div className="rounded-md border p-3">
@@ -139,7 +232,10 @@ export function LocalDrPackageCard() {
                     type="file"
                     accept=".zip"
                     className="block w-full text-xs"
-                    onChange={(e) => setZipFile(e.target.files?.[0] ?? null)}
+                    onChange={(e) => {
+                      resetVerification();
+                      setZipFile(e.target.files?.[0] ?? null);
+                    }}
                   />
                 </div>
                 <div className="space-y-1">
@@ -149,7 +245,10 @@ export function LocalDrPackageCard() {
                     type="file"
                     accept=".json,application/json"
                     className="block w-full text-xs"
-                    onChange={(e) => setReceiptFile(e.target.files?.[0] ?? null)}
+                    onChange={(e) => {
+                      resetVerification();
+                      setReceiptFile(e.target.files?.[0] ?? null);
+                    }}
                   />
                 </div>
               </div>

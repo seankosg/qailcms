@@ -1,6 +1,6 @@
 @echo off
 REM QAIL CMS 재해복구 패키지 생성기 (Windows)
-REM 공용 엔진(run.mjs)을 그대로 호출합니다. OS별 차이는 이 런처와 pg_dump 탐색뿐입니다.
+REM 배포 ZIP 안에서는 run.bundle.mjs, 저장소 안에서는 run.mjs 를 호출합니다.
 setlocal
 cd /d "%~dp0"
 
@@ -14,7 +14,10 @@ if errorlevel 1 (
   exit /b 1
 )
 
-node "%~dp0run.mjs"
+set "ENTRY=%~dp0run.bundle.mjs"
+if not exist "%ENTRY%" set "ENTRY=%~dp0run.mjs"
+
+node "%ENTRY%"
 set EXITCODE=%ERRORLEVEL%
 echo.
 pause
