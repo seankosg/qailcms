@@ -8,7 +8,7 @@
 import readline from "node:readline";
 import path from "node:path";
 import os from "node:os";
-import { mkdirSync, existsSync, readdirSync } from "node:fs";
+import { mkdirSync } from "node:fs";
 import { spawn } from "node:child_process";
 import { buildDrPackage, STATUS } from "./engine/build.mjs";
 import { findPgTools } from "./engine/pgtools.mjs";
@@ -119,14 +119,8 @@ async function main() {
     outDir,
     workDir,
     storageClient,
+    serviceRoleKey: serviceKey,
     fetchAuthUsers: () => storageClient.listUsers(),
-    systemInfo: async () => ({
-      release: { generated_at: new Date().toISOString(), node: process.version, platform: process.platform },
-      migrations: {
-        note: "저장소의 supabase/migrations 목록",
-        files: existsSync("supabase/migrations") ? readdirSync("supabase/migrations") : [],
-      },
-    }),
     onProgress,
   });
 
@@ -137,13 +131,14 @@ async function main() {
     console.log(`  ZIP: ${result.path}`);
     console.log(`  크기: ${(result.bytes / 1024 / 1024).toFixed(1)} MB`);
     console.log(`  SHA-256: ${result.sha256}`);
-    if (result.split_recommended) console.log("  주의: 8 GB 를 초과했습니다. 독립 ZIP 분할을 검토하세요.");
+    if (result.cleanup_warning) console.log(`  경고: 작업 폴더 삭제 실패 — ${result.cleanup_warning.path}`);
     console.log(`  영수증: ${result.receiptPath}`);
     const open = await ask("  폴더를 열까요? (y/N)", "N");
     if (open.toLowerCase() === "y") openFolder(outDir);
   } else {
     console.error(`  상태: ${result.status}`);
     console.error(`  오류: ${result.error}`);
+    if (result.staging_path) console.error(`  작업 폴더(원인 확인 후 수동 삭제): ${result.staging_path}`);
     console.error(`  영수증: ${result.receiptPath}`);
     console.error("  원인을 해결한 뒤 같은 런처를 다시 실행하세요. 이미 만들어진 부분은 재사용하지 않고 처음부터 다시 만듭니다.");
     process.exitCode = 1;
