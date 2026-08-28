@@ -4,7 +4,7 @@
  * 이 파일은 순서·검산·영수증 규칙만 담당하고, 외부 의존(pg_dump 실행·Storage 접근)은
  * 모두 주입받는다. 테스트는 소형 fixture 로 같은 경로를 실행한다.
  */
-import { mkdirSync, writeFileSync, statSync, existsSync } from "node:fs";
+import { mkdirSync, writeFileSync, statSync, existsSync, rmSync } from "node:fs";
 import path from "node:path";
 import { sha256File, sha256Text } from "./hash.mjs";
 import { redact, redactDeep } from "./redact.mjs";
@@ -14,6 +14,7 @@ import { createZip, verifyZip } from "./zip.mjs";
 import { findPathCollisions } from "./paths.mjs";
 import { runPgDump, verifyDumpToc, findPgTools } from "./pgtools.mjs";
 import { README_KR } from "./readme-template.mjs";
+import { defaultSystemInfo } from "./repo.mjs";
 
 export const STATUS = { RUNNING: "running", COMPLETED: "completed", FAILED: "failed", CANCELLED: "cancelled" };
 
@@ -49,8 +50,10 @@ export async function buildDrPackage(opts) {
     tocFn = verifyDumpToc,
     storageClient,
     fetchAuthUsers = async () => ({ users: [], note: "auth 정본은 DB dump 의 auth 스키마입니다." }),
-    systemInfo = async () => ({}),
-    splitThresholdBytes = 8 * 1024 * 1024 * 1024,
+    systemInfo = defaultSystemInfo,
+    serviceRoleKey = null,
+    extraSecrets = [],
+    maxPackageBytes = 8 * 1024 * 1024 * 1024,
   } = opts;
 
   assertBucketScope(buckets);
@@ -59,7 +62,7 @@ export async function buildDrPackage(opts) {
   const runId = `QAIL_DR_${stamp}`;
   const stageRoot = path.join(workDir, runId);
   const receiptPath = path.join(workDir, "run_receipt.json");
-  const secrets = [conn?.password].filter(Boolean);
+  const secrets = [conn?.password, serviceRoleKey, ...extraSecrets].filter((v) => typeof v === "string" && v.length >= 4);
 
   const receipt = {
     run_id: runId,
@@ -72,7 +75,10 @@ export async function buildDrPackage(opts) {
     storage: { buckets: {}, files: 0, bytes: 0 },
     excluded_buckets: EXCLUDED_BUCKETS,
     zip: null,
+    staging_path: stageRoot,
+    cleanup_warning: null,
     error: null,
+    error_code: null,
   };
   const saveReceipt = () => writeJson(receiptPath, redactDeep(receipt, secrets));
   saveReceipt();
@@ -143,8 +149,19 @@ export async function buildDrPackage(opts) {
     // 5) 시스템 참고자료
     onProgress({ step: "system", message: "시스템 정보 기록" });
     const sys = await systemInfo();
-    writeJson(path.join(stageRoot, "system", "release-manifest.json"), redactDeep(sys.release ?? {}, secrets));
-    writeJson(path.join(stageRoot, "system", "migrations-manifest.json"), redactDeep(sys.migrations ?? {}, secrets));
+    const migrations = sys.migrations ?? {};
+    if (!Array.isArray(migrations.files) || migrations.files.length === 0) {
+      const e = new Error("MIGRATIONS_NOT_FOUND: migration 목록이 비어 있어 패키지를 완료할 수 없습니다.");
+      e.code = "MIGRATIONS_NOT_FOUND";
+      throw e;
+    }
+    if (migrations.files.some((f) => !f || typeof f.sha256 !== "string" || f.sha256.length !== 64)) {
+      const e = new Error("MIGRATIONS_NOT_FOUND: migration 파일 SHA-256 이 누락되었습니다.");
+      e.code = "MIGRATIONS_NOT_FOUND";
+      throw e;
+    }
+    writeJson(path.join(stageRoot, "system", "release-manifest.json"), redactDeep({ git_commit: "unknown", ...(sys.release ?? {}) }, secrets));
+    writeJson(path.join(stageRoot, "system", "migrations-manifest.json"), redactDeep(migrations, secrets));
     writeJson(path.join(stageRoot, "system", "environment-template.json"), {
       note: "키 이름만 기록합니다. 실제 비밀값은 포함하지 않습니다.",
       keys: sys.envKeys ?? [
@@ -252,6 +269,18 @@ export async function buildDrPackage(opts) {
     onProgress({ step: "zip", message: "ZIP 생성" });
     const zipPath = path.join(outDir, `${runId}.zip`);
     const zipRes = await createZip(zipEntries, zipPath, (p) => onProgress({ step: "zip", ...p }));
+
+    // 8-1) 8GB 계약: 초과하면 completed 로 처리하지 않고 과대 ZIP 을 삭제한다.
+    if (zipRes.bytes > maxPackageBytes) {
+      const e = new Error(
+        `PACKAGE_SIZE_LIMIT_EXCEEDED: 완성 ZIP ${zipRes.bytes} byte 가 상한 ${maxPackageBytes} byte(8 GB)를 초과했습니다.`,
+      );
+      e.code = "PACKAGE_SIZE_LIMIT_EXCEEDED";
+      e.sizeLimit = { zip_bytes: zipRes.bytes, limit_bytes: maxPackageBytes, zip_path: zipPath };
+      e.cleanupAll = true;
+      throw e;
+    }
+
     const verify = await verifyZip(
       zipPath,
       [`${runId}/backup-manifest.json`, `${runId}/checksums.sha256`, `${runId}/README_KR.md`, `${runId}/database/qail-full-database.dump`],
@@ -259,23 +288,71 @@ export async function buildDrPackage(opts) {
     );
     if (!verify.ok) throw new Error(`ZIP 재개봉 검증 실패: ${verify.reason}`);
 
-    receipt.zip = {
-      path: zipPath,
-      bytes: zipRes.bytes,
-      sha256: zipRes.sha256,
-      entries: zipRes.entries,
-      split_recommended: zipRes.bytes > splitThresholdBytes,
-    };
+    receipt.zip = { path: zipPath, bytes: zipRes.bytes, sha256: zipRes.sha256, entries: zipRes.entries };
+
+    // 9) 검증 통과 후 staging 삭제(최종 ZIP + 영수증만 보존)
+    onProgress({ step: "cleanup", message: "중간 작업파일 정리" });
+    try {
+      rmSync(stageRoot, { recursive: true, force: true });
+      receipt.staging_path = null;
+      receipt.staging_cleaned = true;
+    } catch (cleanupErr) {
+      receipt.staging_cleaned = false;
+      receipt.cleanup_warning = {
+        path: stageRoot,
+        error: redact(cleanupErr?.message || String(cleanupErr), secrets),
+        note: "중간 작업 폴더를 자동 삭제하지 못했습니다. 수동으로 삭제하세요.",
+      };
+    }
+
     receipt.status = STATUS.COMPLETED;
     receipt.finished_at = new Date().toISOString();
     saveReceipt();
     onProgress({ step: "done", message: "완료" });
-    return { ok: true, runId, receiptPath, ...receipt.zip, manifest: backupManifest };
+    return {
+      ok: true,
+      runId,
+      receiptPath,
+      ...receipt.zip,
+      cleanup_warning: receipt.cleanup_warning,
+      manifest: backupManifest,
+    };
   } catch (err) {
     receipt.status = err?.cancelled ? STATUS.CANCELLED : STATUS.FAILED;
+    receipt.error_code = err?.code ?? null;
     receipt.error = redact(err?.stack || err?.message || String(err), secrets);
+    if (err?.sizeLimit) receipt.size_limit = err.sizeLimit;
+    if (err?.cleanupAll) {
+      // 과대 ZIP 과 staging 은 남기지 않는다.
+      try {
+        rmSync(err.sizeLimit.zip_path, { force: true });
+      } catch {
+        /* 무시 */
+      }
+      try {
+        rmSync(stageRoot, { recursive: true, force: true });
+        receipt.staging_path = null;
+      } catch (cleanupErr) {
+        receipt.cleanup_warning = {
+          path: stageRoot,
+          error: redact(cleanupErr?.message || String(cleanupErr), secrets),
+        };
+      }
+    } else {
+      // 실패 원인 확인을 위해 staging 은 보존한다.
+      receipt.staging_path = stageRoot;
+      receipt.staging_cleanup_hint = `원인 확인 후 다음 폴더를 수동으로 삭제하세요: ${stageRoot}`;
+    }
     receipt.finished_at = new Date().toISOString();
     saveReceipt();
-    return { ok: false, runId, receiptPath, status: receipt.status, error: receipt.error };
+    return {
+      ok: false,
+      runId,
+      receiptPath,
+      status: receipt.status,
+      error: receipt.error,
+      error_code: receipt.error_code,
+      staging_path: receipt.staging_path,
+    };
   }
 }
