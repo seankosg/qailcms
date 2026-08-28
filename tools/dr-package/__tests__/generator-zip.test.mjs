@@ -4,7 +4,7 @@
  */
 import { describe, it, expect, beforeAll } from "vitest";
 import { readFileSync, existsSync, mkdtempSync, writeFileSync } from "node:fs";
-import { execFileSync } from "node:child_process";
+import { spawnSync } from "node:child_process";
 import path from "node:path";
 import os from "node:os";
 import { createHash } from "node:crypto";
@@ -93,17 +93,17 @@ describe("로컬 생성기 배포 ZIP", () => {
     expect(specs.filter((s) => !s.startsWith("node:"))).toEqual([]);
 
     const dir = mkdtempSync(path.join(os.tmpdir(), "drgen-"));
+    // node_modules 가 전혀 없는 폴더에서 bundle 단독 실행 (입력 없이 즉시 종료)
     writeFileSync(path.join(dir, "run.bundle.mjs"), bundle, "utf8");
-    // node_modules 가 전혀 없는 폴더에서 import 만 수행 (Wizard 는 실행하지 않음)
-    const probe = path.join(dir, "probe.mjs");
-    writeFileSync(
-      probe,
-      `import(${JSON.stringify(path.join(dir, "run.bundle.mjs"))}).then(()=>{},()=>{});console.log("LOADED");`,
-      "utf8",
-    );
-    const out = execFileSync(process.execPath, [probe], { cwd: dir, timeout: 60_000, stdio: ["ignore", "pipe", "pipe"] })
-      .toString();
-    expect(out).toContain("LOADED");
+    const res = spawnSync(process.execPath, ["run.bundle.mjs"], {
+      cwd: dir,
+      input: "",
+      timeout: 60_000,
+      encoding: "utf8",
+    });
+    const out = `${res.stdout ?? ""}${res.stderr ?? ""}`;
+    expect(out).toContain("QAIL CMS 재해복구 패키지 생성기");
+    expect(out).not.toMatch(/Cannot find (package|module)/i);
   });
 
   it("5. Windows/macOS 런처가 동일 bundle 을 호출한다", () => {
