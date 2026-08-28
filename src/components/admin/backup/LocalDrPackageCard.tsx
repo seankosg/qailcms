@@ -126,6 +126,31 @@ export function LocalDrPackageCard() {
           <li>최종 ZIP은 사용자가 선택한 로컬 폴더가 정본입니다. 서버에 보관하지 않습니다.</li>
         </ul>
 
+        <div className="rounded-md border p-3 space-y-2">
+          <div className="font-medium">로컬 생성기 내려받기</div>
+          <p className="text-xs text-muted-foreground">
+            아래 ZIP 하나만 내려받아 압축을 풀면 됩니다. 별도의 설치·저장소 내려받기·npm install 이 필요 없습니다.
+          </p>
+          <Button size="sm" onClick={downloadGenerator} disabled={!gen || downloading}>
+            {downloading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Download className="mr-2 h-4 w-4" />}
+            로컬 생성기 다운로드
+          </Button>
+          {genError ? (
+            <div className="rounded-md border border-amber-500/40 bg-amber-500/10 p-2 text-xs">
+              생성기 정보를 불러오지 못했습니다 — {genError}
+            </div>
+          ) : null}
+          {gen ? (
+            <dl className="grid gap-x-4 gap-y-1 text-xs sm:grid-cols-2">
+              <Row k="파일" v={`${gen.file} (${bytesToHumanDr(gen.bytes)})`} />
+              <Row k="생성기 버전" v={gen.generator_version} />
+              <Row k="Git commit" v={gen.git_commit_short} />
+              <Row k="SHA-256" v={gen.sha256} />
+              <Row k="포함 migration" v={`${gen.migrations_count}건 / ${gen.migrations_contract_sha256.slice(0, 16)}…`} />
+            </dl>
+          ) : null}
+        </div>
+
         <Tabs defaultValue="windows">
           <TabsList>
             <TabsTrigger value="windows">Windows</TabsTrigger>
@@ -134,19 +159,28 @@ export function LocalDrPackageCard() {
           <TabsContent value="windows" className="pt-2">
             <div className="rounded-md border p-3">
               <div className="font-medium">QAIL-재해복구-패키지-생성.cmd</div>
-              <div className="text-xs text-muted-foreground">더블클릭으로 실행합니다.</div>
+              <ol className="mt-1 list-decimal space-y-0.5 pl-5 text-xs text-muted-foreground">
+                <li>내려받은 ZIP을 마우스 오른쪽 → 「압축 풀기」로 폴더에 풉니다.</li>
+                <li>풀린 폴더의 <code>QAIL-재해복구-패키지-생성.cmd</code> 를 더블클릭합니다.</li>
+                <li>보안 경고가 나오면 「추가 정보 → 실행」을 선택합니다.</li>
+              </ol>
             </div>
           </TabsContent>
           <TabsContent value="macos" className="pt-2">
             <div className="rounded-md border p-3">
               <div className="font-medium">QAIL-재해복구-패키지-생성.command</div>
-              <div className="text-xs text-muted-foreground">더블클릭으로 실행합니다.</div>
+              <ol className="mt-1 list-decimal space-y-0.5 pl-5 text-xs text-muted-foreground">
+                <li>내려받은 ZIP을 더블클릭해 압축을 풉니다.</li>
+                <li>풀린 폴더의 <code>QAIL-재해복구-패키지-생성.command</code> 를 더블클릭합니다.</li>
+                <li>실행이 막히면 터미널에서 <code>chmod +x</code> 후 다시 실행하거나, 오른쪽 클릭 → 「열기」를 선택합니다.</li>
+              </ol>
             </div>
           </TabsContent>
         </Tabs>
         <p className="text-xs text-muted-foreground">
-          두 런처는 동일한 공용 엔진을 사용하므로 OS와 무관하게 같은 형식의 패키지가 만들어집니다.
+          두 런처는 동일한 공용 엔진(run.bundle.mjs)을 호출하므로 OS와 무관하게 같은 형식의 패키지가 만들어집니다.
         </p>
+
 
         <div className="grid gap-3 sm:grid-cols-2">
           <div className="rounded-md border p-3">
