@@ -1,11 +1,11 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
-import { HardDriveDownload, CheckCircle2, XCircle, AlertTriangle, Loader2 } from "lucide-react";
+import { HardDriveDownload, CheckCircle2, XCircle, AlertTriangle, Loader2, Download } from "lucide-react";
 import {
   DR_BUCKETS,
   DR_EXCLUDED_BUCKET,
@@ -16,9 +16,23 @@ import {
 } from "@/lib/backup/dr-local-verify";
 import { sha256OfBlobStream } from "@/lib/backup/sha256-stream";
 
+const GENERATOR_MANIFEST_URL = "/downloads/QAIL-DR-Local-Generator.manifest.json";
+
+type GeneratorManifest = {
+  file: string;
+  url: string;
+  bytes: number;
+  sha256: string;
+  generator_version: string;
+  git_commit_short: string;
+  migrations_count: number;
+  migrations_contract_sha256: string;
+};
+
 /**
  * 로컬 재해복구 패키지 안내·검증 카드 (System Administrator 전용).
- * 선택한 ZIP·영수증 bytes 는 브라우저 밖으로 나가지 않는다 — 이 컴포넌트에는 fetch/업로드가 없다.
+ * 선택한 ZIP·영수증 bytes 는 브라우저 밖으로 나가지 않는다 — 검증부에는 fetch/업로드가 없다.
+ * (생성기 ZIP 다운로드는 정적 배포 자산 GET 이며 사용자 파일을 전송하지 않는다.)
  */
 export function LocalDrPackageCard() {
   const zipRef = useRef<HTMLInputElement>(null);
@@ -30,8 +44,50 @@ export function LocalDrPackageCard() {
   const [result, setResult] = useState<DrVerifyResult | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
+  const [gen, setGen] = useState<GeneratorManifest | null>(null);
+  const [genError, setGenError] = useState<string | null>(null);
+  const [downloading, setDownloading] = useState(false);
 
   const streamOk = supportsStreamingSha256();
+
+  useEffect(() => {
+    let alive = true;
+    fetch(GENERATOR_MANIFEST_URL)
+      .then((r) => (r.ok ? r.json() : Promise.reject(new Error(`HTTP ${r.status}`))))
+      .then((m) => alive && setGen(m))
+      .catch((e) => alive && setGenError(e?.message ?? String(e)));
+    return () => {
+      alive = false;
+    };
+  }, []);
+
+  /** 파일 선택이 바뀌면 이전 검증 결과·오류·진행률·저장 확인을 즉시 초기화한다. */
+  const resetVerification = () => {
+    setResult(null);
+    setError(null);
+    setProgress(0);
+    setSaved(false);
+  };
+
+  const downloadGenerator = async () => {
+    if (!gen) return;
+    setDownloading(true);
+    setGenError(null);
+    try {
+      const res = await fetch(gen.url);
+      if (!res.ok) throw new Error(`다운로드 실패: ${res.status}`);
+      const blob = await res.blob();
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(blob);
+      a.download = gen.file;
+      a.click();
+      URL.revokeObjectURL(a.href);
+    } catch (e: any) {
+      setGenError(e?.message ?? String(e));
+    } finally {
+      setDownloading(false);
+    }
+  };
 
   const runVerify = async () => {
     if (!zipFile || !receiptFile) return;
@@ -52,6 +108,7 @@ export function LocalDrPackageCard() {
   };
 
   const verdict = result?.verdict;
+
 
   return (
     <Card>
