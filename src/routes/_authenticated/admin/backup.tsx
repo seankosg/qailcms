@@ -22,6 +22,7 @@ import {
 } from "@/lib/backup/backup.functions";
 import { BackupHelpDialog } from "@/components/admin/backup/BackupHelpDialog";
 import { SafeRestoreWizard } from "@/components/admin/backup/SafeRestoreWizard";
+import { LocalDrPackageCard } from "@/components/admin/backup/LocalDrPackageCard";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -182,6 +183,8 @@ function BackupPage() {
       </div>
 
       <DeleteResultCard result={deleteResult} />
+
+      {currentUser?.isSystemAdmin ? <LocalDrPackageCard /> : null}
 
       <BackupConfigCard config={config} onUpdated={invalidate} />
       <SnapshotTable snapshots={snapshots} loading={listLoading} onChange={invalidate} onResult={setDeleteResult} />
