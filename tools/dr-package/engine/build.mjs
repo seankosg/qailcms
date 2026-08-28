@@ -269,6 +269,18 @@ export async function buildDrPackage(opts) {
     onProgress({ step: "zip", message: "ZIP 생성" });
     const zipPath = path.join(outDir, `${runId}.zip`);
     const zipRes = await createZip(zipEntries, zipPath, (p) => onProgress({ step: "zip", ...p }));
+
+    // 8-1) 8GB 계약: 초과하면 completed 로 처리하지 않고 과대 ZIP 을 삭제한다.
+    if (zipRes.bytes > maxPackageBytes) {
+      const e = new Error(
+        `PACKAGE_SIZE_LIMIT_EXCEEDED: 완성 ZIP ${zipRes.bytes} byte 가 상한 ${maxPackageBytes} byte(8 GB)를 초과했습니다.`,
+      );
+      e.code = "PACKAGE_SIZE_LIMIT_EXCEEDED";
+      e.sizeLimit = { zip_bytes: zipRes.bytes, limit_bytes: maxPackageBytes, zip_path: zipPath };
+      e.cleanupAll = true;
+      throw e;
+    }
+
     const verify = await verifyZip(
       zipPath,
       [`${runId}/backup-manifest.json`, `${runId}/checksums.sha256`, `${runId}/README_KR.md`, `${runId}/database/qail-full-database.dump`],
@@ -276,23 +288,71 @@ export async function buildDrPackage(opts) {
     );
     if (!verify.ok) throw new Error(`ZIP 재개봉 검증 실패: ${verify.reason}`);
 
-    receipt.zip = {
-      path: zipPath,
-      bytes: zipRes.bytes,
-      sha256: zipRes.sha256,
-      entries: zipRes.entries,
-      split_recommended: zipRes.bytes > splitThresholdBytes,
-    };
+    receipt.zip = { path: zipPath, bytes: zipRes.bytes, sha256: zipRes.sha256, entries: zipRes.entries };
+
+    // 9) 검증 통과 후 staging 삭제(최종 ZIP + 영수증만 보존)
+    onProgress({ step: "cleanup", message: "중간 작업파일 정리" });
+    try {
+      rmSync(stageRoot, { recursive: true, force: true });
+      receipt.staging_path = null;
+      receipt.staging_cleaned = true;
+    } catch (cleanupErr) {
+      receipt.staging_cleaned = false;
+      receipt.cleanup_warning = {
+        path: stageRoot,
+        error: redact(cleanupErr?.message || String(cleanupErr), secrets),
+        note: "중간 작업 폴더를 자동 삭제하지 못했습니다. 수동으로 삭제하세요.",
+      };
+    }
+
     receipt.status = STATUS.COMPLETED;
     receipt.finished_at = new Date().toISOString();
     saveReceipt();
     onProgress({ step: "done", message: "완료" });
-    return { ok: true, runId, receiptPath, ...receipt.zip, manifest: backupManifest };
+    return {
+      ok: true,
+      runId,
+      receiptPath,
+      ...receipt.zip,
+      cleanup_warning: receipt.cleanup_warning,
+      manifest: backupManifest,
+    };
   } catch (err) {
     receipt.status = err?.cancelled ? STATUS.CANCELLED : STATUS.FAILED;
+    receipt.error_code = err?.code ?? null;
     receipt.error = redact(err?.stack || err?.message || String(err), secrets);
+    if (err?.sizeLimit) receipt.size_limit = err.sizeLimit;
+    if (err?.cleanupAll) {
+      // 과대 ZIP 과 staging 은 남기지 않는다.
+      try {
+        rmSync(err.sizeLimit.zip_path, { force: true });
+      } catch {
+        /* 무시 */
+      }
+      try {
+        rmSync(stageRoot, { recursive: true, force: true });
+        receipt.staging_path = null;
+      } catch (cleanupErr) {
+        receipt.cleanup_warning = {
+          path: stageRoot,
+          error: redact(cleanupErr?.message || String(cleanupErr), secrets),
+        };
+      }
+    } else {
+      // 실패 원인 확인을 위해 staging 은 보존한다.
+      receipt.staging_path = stageRoot;
+      receipt.staging_cleanup_hint = `원인 확인 후 다음 폴더를 수동으로 삭제하세요: ${stageRoot}`;
+    }
     receipt.finished_at = new Date().toISOString();
     saveReceipt();
-    return { ok: false, runId, receiptPath, status: receipt.status, error: receipt.error };
+    return {
+      ok: false,
+      runId,
+      receiptPath,
+      status: receipt.status,
+      error: receipt.error,
+      error_code: receipt.error_code,
+      staging_path: receipt.staging_path,
+    };
   }
 }
