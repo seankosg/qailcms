@@ -4,7 +4,7 @@
  * 이 파일은 순서·검산·영수증 규칙만 담당하고, 외부 의존(pg_dump 실행·Storage 접근)은
  * 모두 주입받는다. 테스트는 소형 fixture 로 같은 경로를 실행한다.
  */
-import { mkdirSync, writeFileSync, statSync, existsSync } from "node:fs";
+import { mkdirSync, writeFileSync, statSync, existsSync, rmSync } from "node:fs";
 import path from "node:path";
 import { sha256File, sha256Text } from "./hash.mjs";
 import { redact, redactDeep } from "./redact.mjs";
@@ -14,6 +14,7 @@ import { createZip, verifyZip } from "./zip.mjs";
 import { findPathCollisions } from "./paths.mjs";
 import { runPgDump, verifyDumpToc, findPgTools } from "./pgtools.mjs";
 import { README_KR } from "./readme-template.mjs";
+import { defaultSystemInfo } from "./repo.mjs";
 
 export const STATUS = { RUNNING: "running", COMPLETED: "completed", FAILED: "failed", CANCELLED: "cancelled" };
 
@@ -49,8 +50,10 @@ export async function buildDrPackage(opts) {
     tocFn = verifyDumpToc,
     storageClient,
     fetchAuthUsers = async () => ({ users: [], note: "auth 정본은 DB dump 의 auth 스키마입니다." }),
-    systemInfo = async () => ({}),
-    splitThresholdBytes = 8 * 1024 * 1024 * 1024,
+    systemInfo = defaultSystemInfo,
+    serviceRoleKey = null,
+    extraSecrets = [],
+    maxPackageBytes = 8 * 1024 * 1024 * 1024,
   } = opts;
 
   assertBucketScope(buckets);
@@ -59,7 +62,7 @@ export async function buildDrPackage(opts) {
   const runId = `QAIL_DR_${stamp}`;
   const stageRoot = path.join(workDir, runId);
   const receiptPath = path.join(workDir, "run_receipt.json");
-  const secrets = [conn?.password].filter(Boolean);
+  const secrets = [conn?.password, serviceRoleKey, ...extraSecrets].filter((v) => typeof v === "string" && v.length >= 4);
 
   const receipt = {
     run_id: runId,
@@ -72,7 +75,10 @@ export async function buildDrPackage(opts) {
     storage: { buckets: {}, files: 0, bytes: 0 },
     excluded_buckets: EXCLUDED_BUCKETS,
     zip: null,
+    staging_path: stageRoot,
+    cleanup_warning: null,
     error: null,
+    error_code: null,
   };
   const saveReceipt = () => writeJson(receiptPath, redactDeep(receipt, secrets));
   saveReceipt();
@@ -143,8 +149,19 @@ export async function buildDrPackage(opts) {
     // 5) 시스템 참고자료
     onProgress({ step: "system", message: "시스템 정보 기록" });
     const sys = await systemInfo();
-    writeJson(path.join(stageRoot, "system", "release-manifest.json"), redactDeep(sys.release ?? {}, secrets));
-    writeJson(path.join(stageRoot, "system", "migrations-manifest.json"), redactDeep(sys.migrations ?? {}, secrets));
+    const migrations = sys.migrations ?? {};
+    if (!Array.isArray(migrations.files) || migrations.files.length === 0) {
+      const e = new Error("MIGRATIONS_NOT_FOUND: migration 목록이 비어 있어 패키지를 완료할 수 없습니다.");
+      e.code = "MIGRATIONS_NOT_FOUND";
+      throw e;
+    }
+    if (migrations.files.some((f) => !f || typeof f.sha256 !== "string" || f.sha256.length !== 64)) {
+      const e = new Error("MIGRATIONS_NOT_FOUND: migration 파일 SHA-256 이 누락되었습니다.");
+      e.code = "MIGRATIONS_NOT_FOUND";
+      throw e;
+    }
+    writeJson(path.join(stageRoot, "system", "release-manifest.json"), redactDeep({ git_commit: "unknown", ...(sys.release ?? {}) }, secrets));
+    writeJson(path.join(stageRoot, "system", "migrations-manifest.json"), redactDeep(migrations, secrets));
     writeJson(path.join(stageRoot, "system", "environment-template.json"), {
       note: "키 이름만 기록합니다. 실제 비밀값은 포함하지 않습니다.",
       keys: sys.envKeys ?? [
