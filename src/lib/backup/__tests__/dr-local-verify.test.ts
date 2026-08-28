@@ -97,3 +97,24 @@ describe("streaming sha256", () => {
     expect(streamed).toBe(direct);
   });
 });
+
+describe("HP3 교정 — 파일 변경 시 검증 상태 초기화", () => {
+  it("8/9. 초기화 상태는 결과·오류·진행률·저장 체크를 모두 비운다", () => {
+    const cleared = clearedVerificationState();
+    expect(cleared.result).toBeNull();
+    expect(cleared.error).toBeNull();
+    expect(cleared.progress).toBe(0);
+    expect(cleared.saved).toBe(false);
+  });
+
+  it("8/9. ZIP·영수증 input 양쪽 모두 선택 변경 시 초기화를 호출한다", () => {
+    const src = readFileSync(
+      new URL("../../../components/admin/backup/LocalDrPackageCard.tsx", import.meta.url),
+      "utf8",
+    );
+    const zipBlock = src.slice(src.indexOf('accept=".zip"'), src.indexOf("run_receipt.json</Label>"));
+    const receiptBlock = src.slice(src.indexOf('accept=".json,application/json"'));
+    expect(zipBlock).toContain("resetVerification();");
+    expect(receiptBlock.slice(0, 400)).toContain("resetVerification();");
+  });
+});

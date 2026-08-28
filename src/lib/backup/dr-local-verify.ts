@@ -131,3 +131,19 @@ export function bytesToHumanDr(bytes: number | null | undefined): string {
   }
   return `${size.toFixed(2)} ${units[i]}`;
 }
+
+/** 브라우저 검증 카드의 표시 상태(순수 값). */
+export type DrVerifyUiState = {
+  result: DrVerifyResult | null;
+  error: string | null;
+  progress: number;
+  saved: boolean;
+};
+
+/**
+ * ZIP 또는 run_receipt.json 선택이 바뀔 때 적용할 초기 상태.
+ * 이전 성공 결과·오류·진행률·저장 확인 체크가 남지 않아야 한다.
+ */
+export function clearedVerificationState(): DrVerifyUiState {
+  return { result: null, error: null, progress: 0, saved: false };
+}

@@ -10,6 +10,7 @@ import {
   DR_BUCKETS,
   DR_EXCLUDED_BUCKET,
   bytesToHumanDr,
+  clearedVerificationState,
   supportsStreamingSha256,
   verifyDrPackage,
   type DrVerifyResult,
@@ -63,10 +64,11 @@ export function LocalDrPackageCard() {
 
   /** 파일 선택이 바뀌면 이전 검증 결과·오류·진행률·저장 확인을 즉시 초기화한다. */
   const resetVerification = () => {
-    setResult(null);
-    setError(null);
-    setProgress(0);
-    setSaved(false);
+    const cleared = clearedVerificationState();
+    setResult(cleared.result);
+    setError(cleared.error);
+    setProgress(cleared.progress);
+    setSaved(cleared.saved);
   };
 
   const downloadGenerator = async () => {
