@@ -87,8 +87,10 @@ describe("로컬 생성기 배포 ZIP", () => {
   it("4. run.bundle.mjs 가 의존성을 포함해 node_modules 없이 시작한다", () => {
     const bundle = contents.get("run.bundle.mjs");
     expect(bundle.length).toBeGreaterThan(50_000);
-    expect(/from\s*["']yazl["']/.test(bundle)).toBe(false);
-    expect(/from\s*["']@supabase\/supabase-js["']/.test(bundle)).toBe(false);
+    // 남아 있는 정적 import 는 Node 내장 모듈뿐이어야 한다(별도 node_modules 불필요).
+    const specs = [...bundle.matchAll(/^\s*import\s[^;]*?from\s*["']([^"']+)["']/gm)].map((m) => m[1]);
+    expect(specs.length).toBeGreaterThan(0);
+    expect(specs.filter((s) => !s.startsWith("node:"))).toEqual([]);
 
     const dir = mkdtempSync(path.join(os.tmpdir(), "drgen-"));
     writeFileSync(path.join(dir, "run.bundle.mjs"), bundle, "utf8");
@@ -115,7 +117,15 @@ describe("로컬 생성기 배포 ZIP", () => {
     expect(/service_role\s*[:=]\s*["'][A-Za-z0-9._-]{20,}/.test(joined)).toBe(false);
     expect(/eyJhbGciOiJIUzI1NiI/.test(joined)).toBe(false);
     expect(/sb_secret_/.test(joined)).toBe(false);
-    expect(/postgres:\/\/[^\s"']*:[^\s"'@]+@/.test(joined)).toBe(false);
+    // 저장소 .env 의 실제 값이 어떤 형태로든 들어가지 않았는지 대조한다.
+    const envPath = path.join(ROOT, ".env");
+    if (existsSync(envPath)) {
+      const values = readFileSync(envPath, "utf8")
+        .split(/\r?\n/)
+        .map((l) => l.split("=").slice(1).join("=").trim().replace(/^["']|["']$/g, ""))
+        .filter((v) => v.length >= 12);
+      for (const v of values) expect(joined.includes(v)).toBe(false);
+    }
   });
 
   it("7. UI manifest 의 URL·SHA-256 이 실제 파일과 일치한다", () => {
