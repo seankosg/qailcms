@@ -115,9 +115,8 @@ export function verifyDrPackage(zip: DrZipInput, receipt: any): DrVerifyResult {
 /** 브라우저가 스트리밍 SHA-256 을 지원하는지. 미지원 시 대용량 검증을 하지 않는다. */
 export function supportsStreamingSha256(scope: any = globalThis): boolean {
   return (
-    typeof scope?.crypto?.subtle?.digest === "function" &&
     typeof scope?.ReadableStream === "function" &&
-    typeof (scope?.File?.prototype as any)?.stream === "function"
+    typeof (scope?.Blob?.prototype as any)?.stream === "function"
   );
 }
 
