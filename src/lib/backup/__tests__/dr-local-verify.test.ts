@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
-import { verifyDrPackage, supportsStreamingSha256, DR_BUCKETS } from "../dr-local-verify";
+import { readFileSync } from "node:fs";
+import { verifyDrPackage, supportsStreamingSha256, DR_BUCKETS, clearedVerificationState } from "../dr-local-verify";
 import { Sha256Stream, sha256OfBlobStream } from "../sha256-stream";
 
 const RUN = "QAIL_DR_20260828_010203";
