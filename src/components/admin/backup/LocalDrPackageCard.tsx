@@ -230,7 +230,10 @@ export function LocalDrPackageCard() {
                     type="file"
                     accept=".zip"
                     className="block w-full text-xs"
-                    onChange={(e) => setZipFile(e.target.files?.[0] ?? null)}
+                    onChange={(e) => {
+                      resetVerification();
+                      setZipFile(e.target.files?.[0] ?? null);
+                    }}
                   />
                 </div>
                 <div className="space-y-1">
@@ -240,7 +243,10 @@ export function LocalDrPackageCard() {
                     type="file"
                     accept=".json,application/json"
                     className="block w-full text-xs"
-                    onChange={(e) => setReceiptFile(e.target.files?.[0] ?? null)}
+                    onChange={(e) => {
+                      resetVerification();
+                      setReceiptFile(e.target.files?.[0] ?? null);
+                    }}
                   />
                 </div>
               </div>
