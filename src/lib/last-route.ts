@@ -19,13 +19,14 @@ export function saveLastRoute(href: string) {
   }
 }
 
-export function loadLastRoute(): string | null {
+export function loadLastRoute(isKnownPath?: (path: string) => boolean): string | null {
   if (typeof window === "undefined") return null;
   try {
     const v = window.localStorage.getItem(KEY);
     if (!v || !v.startsWith("/")) return null;
     const path = v.split("?")[0].split("#")[0];
-    if (isInvalidPath(path)) {
+    if (isInvalidPath(path) || (isKnownPath && !isKnownPath(path))) {
+      // 존재하지 않는(구버전) 경로가 저장돼 있으면 폐기한다. 예: /closeout/*
       window.localStorage.removeItem(KEY);
       return null;
     }
