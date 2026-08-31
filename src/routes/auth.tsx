@@ -1,4 +1,4 @@
-import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, useNavigate, useRouter } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -10,6 +10,7 @@ import { Loader2, Eye, EyeOff } from "lucide-react";
 import { useServerFn } from "@tanstack/react-start";
 import { resolveLoginEmail } from "@/lib/auth/resolveLoginEmail.functions";
 import { resolveLandingRoute } from "@/lib/auth/landing";
+import { makeIsKnownPath } from "@/lib/auth/known-path";
 
 export const Route = createFileRoute("/auth")({
   head: () => ({ meta: [{ title: "Sign in — QAIL Closure Document" }] }),
@@ -18,6 +19,7 @@ export const Route = createFileRoute("/auth")({
 
 function AuthPage() {
   const navigate = useNavigate();
+  const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [loginId, setLoginId] = useState("");
   const [password, setPassword] = useState("");
@@ -27,10 +29,10 @@ function AuthPage() {
   useEffect(() => {
     supabase.auth.getSession().then(async ({ data }) => {
       if (!data.session) return;
-      const href = await resolveLandingRoute(data.session.user.id);
+      const href = await resolveLandingRoute(data.session.user.id, makeIsKnownPath(router));
       navigate({ href, replace: true });
     });
-  }, [navigate]);
+  }, [navigate, router]);
 
   const signIn = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -40,7 +42,7 @@ function AuthPage() {
       const { data: signed, error } = await supabase.auth.signInWithPassword({ email, password });
       if (error) throw error;
       toast.success("로그인되었습니다");
-      const href = await resolveLandingRoute(signed.user!.id);
+      const href = await resolveLandingRoute(signed.user!.id, makeIsKnownPath(router));
       navigate({ href, replace: true });
     } catch (err: any) {
       toast.error(err?.message ?? "로그인에 실패했습니다");
