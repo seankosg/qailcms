@@ -120,6 +120,7 @@ export const getDrSnapshotCronStatus = createServerFn({ method: "GET" })
     const job = jobs[0] ?? null;
     return {
       ok: true as const,
+      message: "",
       job,
       expected_schedule: expected,
       mismatch: !job || job.schedule !== expected || !job.active,
