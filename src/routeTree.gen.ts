@@ -35,6 +35,7 @@ import { Route as AuthenticatedAdminMastersRouteImport } from './routes/_authent
 import { Route as AuthenticatedAdminMappingRouteImport } from './routes/_authenticated/admin/mapping'
 import { Route as AuthenticatedAdminBackupRouteImport } from './routes/_authenticated/admin/backup'
 import { Route as AuthenticatedClosureDashboardIndexRouteImport } from './routes/_authenticated/closure/dashboard/index'
+import { Route as ApiPublicDrExportRunRouteImport } from './routes/api/public/dr-export/run'
 import { Route as ApiPublicBackupRunQueuedSnapshotRouteImport } from './routes/api/public/backup/run-queued-snapshot'
 import { Route as ApiPublicBackupAutoSnapshotRouteImport } from './routes/api/public/backup/auto-snapshot'
 import { Route as ApiPublicBackupArchiveDownloadRouteImport } from './routes/api/public/backup/archive-download'
@@ -220,6 +221,11 @@ const AuthenticatedClosureDashboardIndexRoute =
     path: '/closure/dashboard/',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
+const ApiPublicDrExportRunRoute = ApiPublicDrExportRunRouteImport.update({
+  id: '/api/public/dr-export/run',
+  path: '/api/public/dr-export/run',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiPublicBackupRunQueuedSnapshotRoute =
   ApiPublicBackupRunQueuedSnapshotRouteImport.update({
     id: '/api/public/backup/run-queued-snapshot',
@@ -497,6 +503,7 @@ export interface FileRoutesByFullPath {
   '/api/public/backup/archive-download': typeof ApiPublicBackupArchiveDownloadRoute
   '/api/public/backup/auto-snapshot': typeof ApiPublicBackupAutoSnapshotRoute
   '/api/public/backup/run-queued-snapshot': typeof ApiPublicBackupRunQueuedSnapshotRoute
+  '/api/public/dr-export/run': typeof ApiPublicDrExportRunRoute
   '/closure/dashboard/': typeof AuthenticatedClosureDashboardIndexRoute
   '/closure/abd/detail/$id': typeof AuthenticatedClosureAbdDetailIdRoute
   '/closure/abd/import/logs': typeof AuthenticatedClosureAbdImportLogsRoute
@@ -560,6 +567,7 @@ export interface FileRoutesByTo {
   '/api/public/backup/archive-download': typeof ApiPublicBackupArchiveDownloadRoute
   '/api/public/backup/auto-snapshot': typeof ApiPublicBackupAutoSnapshotRoute
   '/api/public/backup/run-queued-snapshot': typeof ApiPublicBackupRunQueuedSnapshotRoute
+  '/api/public/dr-export/run': typeof ApiPublicDrExportRunRoute
   '/closure/dashboard': typeof AuthenticatedClosureDashboardIndexRoute
   '/closure/abd/detail/$id': typeof AuthenticatedClosureAbdDetailIdRoute
   '/closure/abd/import/logs': typeof AuthenticatedClosureAbdImportLogsRoute
@@ -626,6 +634,7 @@ export interface FileRoutesById {
   '/api/public/backup/archive-download': typeof ApiPublicBackupArchiveDownloadRoute
   '/api/public/backup/auto-snapshot': typeof ApiPublicBackupAutoSnapshotRoute
   '/api/public/backup/run-queued-snapshot': typeof ApiPublicBackupRunQueuedSnapshotRoute
+  '/api/public/dr-export/run': typeof ApiPublicDrExportRunRoute
   '/_authenticated/closure/dashboard/': typeof AuthenticatedClosureDashboardIndexRoute
   '/_authenticated/closure/abd/detail/$id': typeof AuthenticatedClosureAbdDetailIdRoute
   '/_authenticated/closure/abd/import/logs': typeof AuthenticatedClosureAbdImportLogsRoute
@@ -692,6 +701,7 @@ export interface FileRouteTypes {
     | '/api/public/backup/archive-download'
     | '/api/public/backup/auto-snapshot'
     | '/api/public/backup/run-queued-snapshot'
+    | '/api/public/dr-export/run'
     | '/closure/dashboard/'
     | '/closure/abd/detail/$id'
     | '/closure/abd/import/logs'
@@ -755,6 +765,7 @@ export interface FileRouteTypes {
     | '/api/public/backup/archive-download'
     | '/api/public/backup/auto-snapshot'
     | '/api/public/backup/run-queued-snapshot'
+    | '/api/public/dr-export/run'
     | '/closure/dashboard'
     | '/closure/abd/detail/$id'
     | '/closure/abd/import/logs'
@@ -820,6 +831,7 @@ export interface FileRouteTypes {
     | '/api/public/backup/archive-download'
     | '/api/public/backup/auto-snapshot'
     | '/api/public/backup/run-queued-snapshot'
+    | '/api/public/dr-export/run'
     | '/_authenticated/closure/dashboard/'
     | '/_authenticated/closure/abd/detail/$id'
     | '/_authenticated/closure/abd/import/logs'
@@ -840,6 +852,7 @@ export interface RootRouteChildren {
   ApiPublicBackupArchiveDownloadRoute: typeof ApiPublicBackupArchiveDownloadRoute
   ApiPublicBackupAutoSnapshotRoute: typeof ApiPublicBackupAutoSnapshotRoute
   ApiPublicBackupRunQueuedSnapshotRoute: typeof ApiPublicBackupRunQueuedSnapshotRoute
+  ApiPublicDrExportRunRoute: typeof ApiPublicDrExportRunRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -1025,6 +1038,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/closure/dashboard/'
       preLoaderRoute: typeof AuthenticatedClosureDashboardIndexRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/api/public/dr-export/run': {
+      id: '/api/public/dr-export/run'
+      path: '/api/public/dr-export/run'
+      fullPath: '/api/public/dr-export/run'
+      preLoaderRoute: typeof ApiPublicDrExportRunRouteImport
+      parentRoute: typeof rootRouteImport
     }
     '/api/public/backup/run-queued-snapshot': {
       id: '/api/public/backup/run-queued-snapshot'
@@ -1469,6 +1489,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiPublicBackupArchiveDownloadRoute: ApiPublicBackupArchiveDownloadRoute,
   ApiPublicBackupAutoSnapshotRoute: ApiPublicBackupAutoSnapshotRoute,
   ApiPublicBackupRunQueuedSnapshotRoute: ApiPublicBackupRunQueuedSnapshotRoute,
+  ApiPublicDrExportRunRoute: ApiPublicDrExportRunRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

@@ -106,7 +106,15 @@ export const getDrSnapshotCronStatus = createServerFn({ method: "GET" })
     await assertSystemAdmin(context.supabase, context.userId);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { data, error } = await (supabaseAdmin as any).rpc("dr_snapshot_cron_status");
-    if (error) return { ok: false as const, message: error.message, jobs: [] as unknown[] };
+    if (error) {
+      return {
+        ok: false as const,
+        message: String(error.message ?? ""),
+        job: null,
+        expected_schedule: "50 20 * * *",
+        mismatch: true,
+      };
+    }
     const jobs = (data ?? []) as { jobname: string; schedule: string; active: boolean }[];
     const expected = "50 20 * * *";
     const job = jobs[0] ?? null;
