@@ -3,7 +3,7 @@
  * 인증: Authorization: Bearer <일회용 DR 토큰>
  */
 import { createFileRoute } from "@tanstack/react-router";
-import { drJsonError, withDrToken } from "./_shared";
+import { drJsonError, withDrToken } from "./-shared";
 import { DR_PACKAGE_SCHEMA_VERSION, DR_WORK_BUCKETS } from "@/lib/backup/dr-export-contract";
 
 export const Route = createFileRoute("/api/public/dr-export/run")({

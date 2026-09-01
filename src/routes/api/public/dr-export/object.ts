@@ -1,6 +1,6 @@
 /** 논리 DR — 업무 버킷의 개별 파일 스트리밍(목록에 실재하는 경로만). */
 import { createFileRoute } from "@tanstack/react-router";
-import { drJsonError, streamBlob, withDrToken } from "./_shared";
+import { drJsonError, streamBlob, withDrToken } from "./-shared";
 
 export const Route = createFileRoute("/api/public/dr-export/object")({
   server: {

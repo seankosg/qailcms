@@ -1,6 +1,6 @@
 /** 논리 DR — manifest 가 선언한 Snapshot part 만 스트리밍한다. */
 import { createFileRoute } from "@tanstack/react-router";
-import { drJsonError, streamBlob, withDrToken } from "./_shared";
+import { drJsonError, streamBlob, withDrToken } from "./-shared";
 
 export const Route = createFileRoute("/api/public/dr-export/part")({
   server: {

@@ -3,7 +3,7 @@
  * 실패 파일이 하나라도 있으면 completed 로 확정하지 않는다.
  */
 import { createFileRoute } from "@tanstack/react-router";
-import { drJsonError, withDrToken } from "./_shared";
+import { drJsonError, withDrToken } from "./-shared";
 import { maskDrSecret } from "@/lib/backup/dr-export-contract";
 
 export const Route = createFileRoute("/api/public/dr-export/complete")({

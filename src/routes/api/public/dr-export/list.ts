@@ -1,6 +1,6 @@
 /** 논리 DR — 업무 버킷 재귀 목록(페이지네이션). 허용 7개 버킷 외에는 거부한다. */
 import { createFileRoute } from "@tanstack/react-router";
-import { withDrToken } from "./_shared";
+import { withDrToken } from "./-shared";
 import { DR_LIST_PAGE_MAX } from "@/lib/backup/dr-export-contract";
 
 export const Route = createFileRoute("/api/public/dr-export/list")({
