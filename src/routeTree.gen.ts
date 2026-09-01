@@ -36,6 +36,11 @@ import { Route as AuthenticatedAdminMappingRouteImport } from './routes/_authent
 import { Route as AuthenticatedAdminBackupRouteImport } from './routes/_authenticated/admin/backup'
 import { Route as AuthenticatedClosureDashboardIndexRouteImport } from './routes/_authenticated/closure/dashboard/index'
 import { Route as ApiPublicDrExportRunRouteImport } from './routes/api/public/dr-export/run'
+import { Route as ApiPublicDrExportPartRouteImport } from './routes/api/public/dr-export/part'
+import { Route as ApiPublicDrExportObjectRouteImport } from './routes/api/public/dr-export/object'
+import { Route as ApiPublicDrExportManifestRouteImport } from './routes/api/public/dr-export/manifest'
+import { Route as ApiPublicDrExportListRouteImport } from './routes/api/public/dr-export/list'
+import { Route as ApiPublicDrExportCompleteRouteImport } from './routes/api/public/dr-export/complete'
 import { Route as ApiPublicBackupRunQueuedSnapshotRouteImport } from './routes/api/public/backup/run-queued-snapshot'
 import { Route as ApiPublicBackupAutoSnapshotRouteImport } from './routes/api/public/backup/auto-snapshot'
 import { Route as ApiPublicBackupArchiveDownloadRouteImport } from './routes/api/public/backup/archive-download'
@@ -226,6 +231,33 @@ const ApiPublicDrExportRunRoute = ApiPublicDrExportRunRouteImport.update({
   path: '/api/public/dr-export/run',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiPublicDrExportPartRoute = ApiPublicDrExportPartRouteImport.update({
+  id: '/api/public/dr-export/part',
+  path: '/api/public/dr-export/part',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiPublicDrExportObjectRoute = ApiPublicDrExportObjectRouteImport.update({
+  id: '/api/public/dr-export/object',
+  path: '/api/public/dr-export/object',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiPublicDrExportManifestRoute =
+  ApiPublicDrExportManifestRouteImport.update({
+    id: '/api/public/dr-export/manifest',
+    path: '/api/public/dr-export/manifest',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const ApiPublicDrExportListRoute = ApiPublicDrExportListRouteImport.update({
+  id: '/api/public/dr-export/list',
+  path: '/api/public/dr-export/list',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiPublicDrExportCompleteRoute =
+  ApiPublicDrExportCompleteRouteImport.update({
+    id: '/api/public/dr-export/complete',
+    path: '/api/public/dr-export/complete',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiPublicBackupRunQueuedSnapshotRoute =
   ApiPublicBackupRunQueuedSnapshotRouteImport.update({
     id: '/api/public/backup/run-queued-snapshot',
@@ -503,6 +535,11 @@ export interface FileRoutesByFullPath {
   '/api/public/backup/archive-download': typeof ApiPublicBackupArchiveDownloadRoute
   '/api/public/backup/auto-snapshot': typeof ApiPublicBackupAutoSnapshotRoute
   '/api/public/backup/run-queued-snapshot': typeof ApiPublicBackupRunQueuedSnapshotRoute
+  '/api/public/dr-export/complete': typeof ApiPublicDrExportCompleteRoute
+  '/api/public/dr-export/list': typeof ApiPublicDrExportListRoute
+  '/api/public/dr-export/manifest': typeof ApiPublicDrExportManifestRoute
+  '/api/public/dr-export/object': typeof ApiPublicDrExportObjectRoute
+  '/api/public/dr-export/part': typeof ApiPublicDrExportPartRoute
   '/api/public/dr-export/run': typeof ApiPublicDrExportRunRoute
   '/closure/dashboard/': typeof AuthenticatedClosureDashboardIndexRoute
   '/closure/abd/detail/$id': typeof AuthenticatedClosureAbdDetailIdRoute
@@ -567,6 +604,11 @@ export interface FileRoutesByTo {
   '/api/public/backup/archive-download': typeof ApiPublicBackupArchiveDownloadRoute
   '/api/public/backup/auto-snapshot': typeof ApiPublicBackupAutoSnapshotRoute
   '/api/public/backup/run-queued-snapshot': typeof ApiPublicBackupRunQueuedSnapshotRoute
+  '/api/public/dr-export/complete': typeof ApiPublicDrExportCompleteRoute
+  '/api/public/dr-export/list': typeof ApiPublicDrExportListRoute
+  '/api/public/dr-export/manifest': typeof ApiPublicDrExportManifestRoute
+  '/api/public/dr-export/object': typeof ApiPublicDrExportObjectRoute
+  '/api/public/dr-export/part': typeof ApiPublicDrExportPartRoute
   '/api/public/dr-export/run': typeof ApiPublicDrExportRunRoute
   '/closure/dashboard': typeof AuthenticatedClosureDashboardIndexRoute
   '/closure/abd/detail/$id': typeof AuthenticatedClosureAbdDetailIdRoute
@@ -634,6 +676,11 @@ export interface FileRoutesById {
   '/api/public/backup/archive-download': typeof ApiPublicBackupArchiveDownloadRoute
   '/api/public/backup/auto-snapshot': typeof ApiPublicBackupAutoSnapshotRoute
   '/api/public/backup/run-queued-snapshot': typeof ApiPublicBackupRunQueuedSnapshotRoute
+  '/api/public/dr-export/complete': typeof ApiPublicDrExportCompleteRoute
+  '/api/public/dr-export/list': typeof ApiPublicDrExportListRoute
+  '/api/public/dr-export/manifest': typeof ApiPublicDrExportManifestRoute
+  '/api/public/dr-export/object': typeof ApiPublicDrExportObjectRoute
+  '/api/public/dr-export/part': typeof ApiPublicDrExportPartRoute
   '/api/public/dr-export/run': typeof ApiPublicDrExportRunRoute
   '/_authenticated/closure/dashboard/': typeof AuthenticatedClosureDashboardIndexRoute
   '/_authenticated/closure/abd/detail/$id': typeof AuthenticatedClosureAbdDetailIdRoute
@@ -701,6 +748,11 @@ export interface FileRouteTypes {
     | '/api/public/backup/archive-download'
     | '/api/public/backup/auto-snapshot'
     | '/api/public/backup/run-queued-snapshot'
+    | '/api/public/dr-export/complete'
+    | '/api/public/dr-export/list'
+    | '/api/public/dr-export/manifest'
+    | '/api/public/dr-export/object'
+    | '/api/public/dr-export/part'
     | '/api/public/dr-export/run'
     | '/closure/dashboard/'
     | '/closure/abd/detail/$id'
@@ -765,6 +817,11 @@ export interface FileRouteTypes {
     | '/api/public/backup/archive-download'
     | '/api/public/backup/auto-snapshot'
     | '/api/public/backup/run-queued-snapshot'
+    | '/api/public/dr-export/complete'
+    | '/api/public/dr-export/list'
+    | '/api/public/dr-export/manifest'
+    | '/api/public/dr-export/object'
+    | '/api/public/dr-export/part'
     | '/api/public/dr-export/run'
     | '/closure/dashboard'
     | '/closure/abd/detail/$id'
@@ -831,6 +888,11 @@ export interface FileRouteTypes {
     | '/api/public/backup/archive-download'
     | '/api/public/backup/auto-snapshot'
     | '/api/public/backup/run-queued-snapshot'
+    | '/api/public/dr-export/complete'
+    | '/api/public/dr-export/list'
+    | '/api/public/dr-export/manifest'
+    | '/api/public/dr-export/object'
+    | '/api/public/dr-export/part'
     | '/api/public/dr-export/run'
     | '/_authenticated/closure/dashboard/'
     | '/_authenticated/closure/abd/detail/$id'
@@ -852,6 +914,11 @@ export interface RootRouteChildren {
   ApiPublicBackupArchiveDownloadRoute: typeof ApiPublicBackupArchiveDownloadRoute
   ApiPublicBackupAutoSnapshotRoute: typeof ApiPublicBackupAutoSnapshotRoute
   ApiPublicBackupRunQueuedSnapshotRoute: typeof ApiPublicBackupRunQueuedSnapshotRoute
+  ApiPublicDrExportCompleteRoute: typeof ApiPublicDrExportCompleteRoute
+  ApiPublicDrExportListRoute: typeof ApiPublicDrExportListRoute
+  ApiPublicDrExportManifestRoute: typeof ApiPublicDrExportManifestRoute
+  ApiPublicDrExportObjectRoute: typeof ApiPublicDrExportObjectRoute
+  ApiPublicDrExportPartRoute: typeof ApiPublicDrExportPartRoute
   ApiPublicDrExportRunRoute: typeof ApiPublicDrExportRunRoute
 }
 
@@ -1044,6 +1111,41 @@ declare module '@tanstack/react-router' {
       path: '/api/public/dr-export/run'
       fullPath: '/api/public/dr-export/run'
       preLoaderRoute: typeof ApiPublicDrExportRunRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/dr-export/part': {
+      id: '/api/public/dr-export/part'
+      path: '/api/public/dr-export/part'
+      fullPath: '/api/public/dr-export/part'
+      preLoaderRoute: typeof ApiPublicDrExportPartRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/dr-export/object': {
+      id: '/api/public/dr-export/object'
+      path: '/api/public/dr-export/object'
+      fullPath: '/api/public/dr-export/object'
+      preLoaderRoute: typeof ApiPublicDrExportObjectRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/dr-export/manifest': {
+      id: '/api/public/dr-export/manifest'
+      path: '/api/public/dr-export/manifest'
+      fullPath: '/api/public/dr-export/manifest'
+      preLoaderRoute: typeof ApiPublicDrExportManifestRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/dr-export/list': {
+      id: '/api/public/dr-export/list'
+      path: '/api/public/dr-export/list'
+      fullPath: '/api/public/dr-export/list'
+      preLoaderRoute: typeof ApiPublicDrExportListRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/dr-export/complete': {
+      id: '/api/public/dr-export/complete'
+      path: '/api/public/dr-export/complete'
+      fullPath: '/api/public/dr-export/complete'
+      preLoaderRoute: typeof ApiPublicDrExportCompleteRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/public/backup/run-queued-snapshot': {
@@ -1489,6 +1591,11 @@ const rootRouteChildren: RootRouteChildren = {
   ApiPublicBackupArchiveDownloadRoute: ApiPublicBackupArchiveDownloadRoute,
   ApiPublicBackupAutoSnapshotRoute: ApiPublicBackupAutoSnapshotRoute,
   ApiPublicBackupRunQueuedSnapshotRoute: ApiPublicBackupRunQueuedSnapshotRoute,
+  ApiPublicDrExportCompleteRoute: ApiPublicDrExportCompleteRoute,
+  ApiPublicDrExportListRoute: ApiPublicDrExportListRoute,
+  ApiPublicDrExportManifestRoute: ApiPublicDrExportManifestRoute,
+  ApiPublicDrExportObjectRoute: ApiPublicDrExportObjectRoute,
+  ApiPublicDrExportPartRoute: ApiPublicDrExportPartRoute,
   ApiPublicDrExportRunRoute: ApiPublicDrExportRunRoute,
 }
 export const routeTree = rootRouteImport
