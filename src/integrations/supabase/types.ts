@@ -3717,6 +3717,75 @@ export type Database = {
           },
         ]
       }
+      dr_export_runs: {
+        Row: {
+          buckets: string[]
+          bytes_downloaded: number
+          cancelled_at: string | null
+          completed_at: string | null
+          created_at: string
+          error_code: string | null
+          error_message: string | null
+          expires_at: string
+          files_downloaded: number
+          first_used_at: string | null
+          id: string
+          issued_at: string
+          issued_by: string
+          receipt: Json | null
+          snapshot_id: string
+          snapshot_manifest_sha256: string | null
+          snapshot_overall_sha256: string | null
+          status: string
+          token_sha256: string
+          updated_at: string
+        }
+        Insert: {
+          buckets: string[]
+          bytes_downloaded?: number
+          cancelled_at?: string | null
+          completed_at?: string | null
+          created_at?: string
+          error_code?: string | null
+          error_message?: string | null
+          expires_at: string
+          files_downloaded?: number
+          first_used_at?: string | null
+          id?: string
+          issued_at?: string
+          issued_by: string
+          receipt?: Json | null
+          snapshot_id: string
+          snapshot_manifest_sha256?: string | null
+          snapshot_overall_sha256?: string | null
+          status?: string
+          token_sha256: string
+          updated_at?: string
+        }
+        Update: {
+          buckets?: string[]
+          bytes_downloaded?: number
+          cancelled_at?: string | null
+          completed_at?: string | null
+          created_at?: string
+          error_code?: string | null
+          error_message?: string | null
+          expires_at?: string
+          files_downloaded?: number
+          first_used_at?: string | null
+          id?: string
+          issued_at?: string
+          issued_by?: string
+          receipt?: Json | null
+          snapshot_id?: string
+          snapshot_manifest_sha256?: string | null
+          snapshot_overall_sha256?: string | null
+          status?: string
+          token_sha256?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       hdec_eng_name_master: {
         Row: {
           created_at: string
@@ -9289,6 +9358,14 @@ export type Database = {
       dmr_period_canon: {
         Args: { _end: string; _from_zero?: boolean; _start: string }
         Returns: Json
+      }
+      dr_snapshot_cron_status: {
+        Args: never
+        Returns: {
+          active: boolean
+          jobname: string
+          schedule: string
+        }[]
       }
       get_backup_tables: { Args: never; Returns: string[] }
       get_module_backup_tables: { Args: { _module: string }; Returns: string[] }
