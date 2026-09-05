@@ -248,6 +248,24 @@ export function exportSnagMatrixToXlsx(args: {
           const style = numCell({ bg, bold: emphasize || isTotalGroup || bn || sc.slot === "issued", color, pct: showPct });
           const v = showPct ? (ratio == null ? "–" : ratio) : count;
           const cBase = base + slotOffset(si, dual);
+          if (eachDate && sc.slot !== "issued") {
+            const stageDone = t.issued > 0 && t.issued - doneVal <= 0;
+            const dv = stageDate
+              ? stageDate(sc.slot as StageMetric, team, stageDone ? "actual" : "planned")
+              : null;
+            put(ws, r, cBase + ti, formatHoDate(dv), {
+              font: {
+                name: F,
+                sz: 10,
+                bold: emphasize || isTotalGroup,
+                color: { rgb: dv ? (stageDone ? "FF6B7280" : "FF111827") : "FF9CA3AF" },
+              },
+              fill: { fgColor: { rgb: isTotalGroup || emphasize ? TOTAL_BG : GROUP_BG[gi % 2] } },
+              alignment: { vertical: "center", horizontal: "center" },
+              border: BOX,
+            });
+            return;
+          }
           put(ws, r, cBase + ti, v, style);
           if (dual && sc.slot !== "issued") {
             const stageDone = t.issued > 0 && t.issued - doneVal <= 0;
