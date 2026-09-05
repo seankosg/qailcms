@@ -2,6 +2,7 @@
 import XLSX from "xlsx-js-style";
 import { dohaDateTime } from "@/lib/time/doha";
 import { formatHoDate, EMPTY_HO_DATE_MAP, type HoDateMap } from "./ho-dates";
+import { EMPTY_STAGE_DATE_MAP, type StageDateMap } from "./stage-dates";
 import {
   TEAM_COL_ORDER,
   bottleneckTeam,
@@ -88,6 +89,15 @@ function groupColsFor(block: MatrixBlock) {
   ];
 }
 const PER_GROUP = SLOTS.length * TEAM_COL_ORDER.length;
+/** 잔여+Date: Issued 3열 + 스테이지 5개 × (잔여 3 + Date 3) */
+const PER_GROUP_DUAL = TEAM_COL_ORDER.length + STAGE_METRICS.length * TEAM_COL_ORDER.length * 2;
+/** 그룹 내 슬롯 시작 열 오프셋 */
+const slotOffset = (si: number, dual: boolean) =>
+  dual
+    ? si === 0
+      ? 0
+      : TEAM_COL_ORDER.length + (si - 1) * TEAM_COL_ORDER.length * 2
+    : si * TEAM_COL_ORDER.length;
 
 export function exportSnagMatrixToXlsx(args: {
   matrix: MatrixShape;
@@ -98,11 +108,18 @@ export function exportSnagMatrixToXlsx(args: {
   userName?: string;
   showHoDate?: boolean;
   hoDates?: HoDateMap;
+  /** 잔여 개수 + Date 병기 모드 */
+  remainDate?: boolean;
+  stageDates?: StageDateMap;
 }) {
-  const { matrix, mode, asOf } = args;
-  const showHoDate = !!args.showHoDate;
+  const { matrix, asOf } = args;
+  const dual = !!args.remainDate;
+  const mode = dual ? "remain" : args.mode;
+  const showHoDate = !dual && !!args.showHoDate;
   const hoDates = args.hoDates ?? EMPTY_HO_DATE_MAP;
-  const GROUP_SPAN = PER_GROUP + (showHoDate ? 1 : 0);
+  const stageDates = args.stageDates ?? EMPTY_STAGE_DATE_MAP;
+  const perGroup = dual ? PER_GROUP_DUAL : PER_GROUP;
+  const GROUP_SPAN = perGroup + (showHoDate ? 1 : 0);
   const wb = XLSX.utils.book_new();
 
   for (const block of matrix.blocks) {
@@ -118,7 +135,9 @@ export function exportSnagMatrixToXlsx(args: {
     const metaLine = [
       `As-of: ${asOf}`,
       `표기: ${
-        mode === "pct"
+        dual
+          ? "잔여 개수 + 스테이지 날짜(계획일 / 완료 시 실적일)"
+          : mode === "pct"
           ? "% (Rect/Closed = 같은 팀 Issued 대비)"
           : mode === "remain"
             ? "잔여 개수 (Issued − 실적)"
