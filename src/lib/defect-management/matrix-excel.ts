@@ -110,10 +110,13 @@ export function exportSnagMatrixToXlsx(args: {
   hoDates?: HoDateMap;
   /** 잔여 개수 + Date 병기 모드 */
   remainDate?: boolean;
+  /** Each Date 모드 — 스테이지 셀 숫자를 날짜로 대체 */
+  eachDate?: boolean;
   stageDates?: StageDateMap;
 }) {
   const { matrix, asOf } = args;
   const dual = !!args.remainDate;
+  const eachDate = !dual && !!args.eachDate;
   const mode = dual ? "remain" : args.mode;
   const showHoDate = !dual && !!args.showHoDate;
   const hoDates = args.hoDates ?? EMPTY_HO_DATE_MAP;
