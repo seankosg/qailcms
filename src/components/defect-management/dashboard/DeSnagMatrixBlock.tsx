@@ -301,14 +301,14 @@ function MatrixHeader({
       {/* Tier 1: Room Group */}
       <tr>
         <th
-          rowSpan={3}
+          rowSpan={dual ? 4 : 3}
           className="sticky left-0 top-0 z-40 min-w-[100px] border-b-2 border-r px-2 py-1.5 text-left text-[11px] font-semibold"
           style={{ background: "color-mix(in oklab, var(--muted) 70%, var(--card))" }}
         >
           {block.rowAxis.primary}
         </th>
         <th
-          rowSpan={3}
+          rowSpan={dual ? 4 : 3}
           className="sticky left-[100px] top-0 z-40 min-w-[80px] border-b-2 border-r px-2 py-1.5 text-left text-[11px] font-semibold"
           style={{ background: "color-mix(in oklab, var(--muted) 70%, var(--card))" }}
         >
@@ -317,7 +317,7 @@ function MatrixHeader({
         {groups.map((g, idx) => (
           <th
             key={g.key}
-            colSpan={COLS_PER_GROUP + (showHoDate ? 1 : 0)}
+            colSpan={perGroupCols(dual) + (showHoDate ? 1 : 0)}
             className="sticky top-0 z-30 border-b border-l-2 border-l-border px-2 py-1.5 text-center text-[11px] font-semibold uppercase tracking-wide"
             style={{ background: groupBg(g, idx) }}
           >
