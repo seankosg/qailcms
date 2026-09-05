@@ -237,9 +237,11 @@ function TeamCells({
             kind === "date" || dateOnly
               ? stageDone
                 ? "text-muted-foreground"
-                : dateValue
-                  ? "text-foreground"
-                  : "text-muted-foreground/50"
+                : overdue
+                  ? "text-destructive font-bold"
+                  : dateValue
+                    ? "text-foreground"
+                    : "text-muted-foreground/50"
               : showPct
                 ? isRemainMode
                   ? remainPctTone(ratio)
