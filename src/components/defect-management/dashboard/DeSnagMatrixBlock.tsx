@@ -554,14 +554,15 @@ export function DeSnagMatrixBlock({
               {block.columnKeys.map((rg, idx) => (
                 <Fragment key={rg}>
                   <TeamCells
+                    dual={dual}
                     stats={block.colTotals[rg]}
                     mode={mode}
                     onCell={(slot, team) => goCell(null, null, rg, slot, team)}
                     groupIndex={idx}
                     isTotal
-                    stickyTop={78}
+                    stickyTop={TOTAL_ROW_TOP(dual)}
                     stageDate={
-                      eachDate
+                      eachDate || remainDate
                         ? (stage, team, which) => stageDates.col(block.kind, rg, stage, team, which)
                         : undefined
                     }
@@ -571,20 +572,21 @@ export function DeSnagMatrixBlock({
                       value={hoDates.col(block.kind, rg)}
                       groupIndex={idx}
                       isTotal
-                      stickyTop={78}
+                      stickyTop={TOTAL_ROW_TOP(dual)}
                     />
                   )}
                 </Fragment>
               ))}
               <TeamCells
+                dual={dual}
                 stats={block.blockTotal}
                 mode={mode}
                 onCell={(slot, team) => goCell(null, null, "__ROW_TOTAL__", slot, team)}
                 groupIndex={block.columnKeys.length}
                 isTotal
-                stickyTop={78}
+                stickyTop={TOTAL_ROW_TOP(dual)}
                 stageDate={
-                  eachDate
+                  eachDate || remainDate
                     ? (stage, team, which) => stageDates.block(block.kind, stage, team, which)
                     : undefined
                 }
@@ -594,7 +596,7 @@ export function DeSnagMatrixBlock({
                   value={hoDates.block(block.kind)}
                   groupIndex={block.columnKeys.length}
                   isTotal
-                  stickyTop={78}
+                  stickyTop={TOTAL_ROW_TOP(dual)}
                 />
               )}
             </tr>
@@ -701,13 +703,14 @@ function FragmentRows({
           {block.columnKeys.map((rg, gIdx) => (
             <Fragment key={rg}>
               <TeamCells
+                dual={dual}
                 stats={r.cells[rg]}
                 mode={mode}
                 onCell={(slot, team) => goCell(r.building, r.levelDisp, rg, slot, team)}
                 dim={r.cells[rg].issued === 0}
                 groupIndex={gIdx}
                 stageDate={
-                  eachDate
+                  eachDate || remainDate
                     ? (stage, team, which) =>
                         stageDates.cell(block.kind, r.building, r.levelDisp, rg, stage, team, which)
                     : undefined
@@ -722,13 +725,14 @@ function FragmentRows({
             </Fragment>
           ))}
           <TeamCells
+            dual={dual}
             stats={r.rowTotal}
             mode={mode}
             onCell={(slot, team) => goCell(r.building, r.levelDisp, "__ROW_TOTAL__", slot, team)}
             groupIndex={block.columnKeys.length}
             isTotal
             stageDate={
-              eachDate
+              eachDate || remainDate
                 ? (stage, team, which) =>
                     stageDates.row(block.kind, r.building, r.levelDisp, stage, team, which)
                 : undefined
@@ -764,12 +768,13 @@ function FragmentRows({
             return (
               <Fragment key={rg}>
                 <TeamCells
+                  dual={dual}
                   stats={sub}
                   mode={mode}
                   onCell={(slot, team) => goCell(group.building, null, rg, slot, team)}
                   groupIndex={gIdx}
                   stageDate={
-                    eachDate
+                    eachDate || remainDate
                       ? (stage, team, which) =>
                           stageDates.buildingCol(block.kind, group.building, rg, stage, team, which)
                       : undefined
@@ -780,13 +785,14 @@ function FragmentRows({
             );
           })}
           <TeamCells
+            dual={dual}
             stats={group.subtotal}
             mode={mode}
             onCell={(slot, team) => goCell(group.building, null, "__BUILDING_SUBTOTAL__", slot, team)}
             groupIndex={block.columnKeys.length}
             isTotal
             stageDate={
-              eachDate
+              eachDate || remainDate
                 ? (stage, team, which) =>
                     stageDates.building(block.kind, group.building, stage, team, which)
                 : undefined
