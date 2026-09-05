@@ -404,7 +404,7 @@ function MatrixHeader({
                     )}
                     style={{ background: groupBg(g, idx) }}
                   >
-                    {sc.slot === "issued" ? "개수" : kind === "num" ? "잔여" : "Date"}
+                    {sc.slot === "issued" ? "개수" : kind === "num" ? "Remain" : "Date"}
                   </th>
                 ),
               ),
