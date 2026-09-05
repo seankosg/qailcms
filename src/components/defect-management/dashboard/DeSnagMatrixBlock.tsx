@@ -91,7 +91,7 @@ function remainPctTone(pct: number | null): string {
   return pctTone(100 - pct);
 }
 
-/** Render 9 team-decomposed <td> cells (Issued/Rect/Closed × Elec/Mech/Arch). */
+/** Render team-decomposed <td> cells (Issued/Stage × Elec/Mech/Arch, 잔여+Date 모드에서는 Date 열 추가). */
 function TeamCells({
   stats,
   mode,
@@ -101,6 +101,7 @@ function TeamCells({
   isTotal,
   stickyTop,
   stageDate,
+  dual,
 }: {
   stats: Stats;
   mode: MatrixMode;
@@ -109,8 +110,10 @@ function TeamCells({
   groupIndex: number;
   isTotal?: boolean;
   stickyTop?: number;
-  /** 지정되면 Each Date 모드 — 숫자 대신 날짜(dd/mmm)를 표시한다 */
+  /** 지정되면 날짜 조회 가능 — Each Date(대체) 또는 잔여+Date(병기) */
   stageDate?: StageDateLookup;
+  /** true = 잔여 개수와 Date 를 나란히 표시 */
+  dual?: boolean;
 }) {
   const groupBg = isTotal ? "bg-yellow-400/10" : groupIndex % 2 === 0 ? "bg-transparent" : "bg-muted/20";
   const stickyBg = isTotal
@@ -123,9 +126,7 @@ function TeamCells({
   for (const m of STAGE_METRICS) bottlenecks[m.slot] = bottleneckTeam(stats.byTeam, m.slot);
 
   // 잔여 모드 전용 Room Group 단위 상태 하이라이트
-  // Rect 잔여가 3개 팀 모두 0 → Ready for Inspection(하늘색)
-  // Closed 잔여가 3개 팀 모두 0 → Ready for Handover(초록색)
-  const isRemainMode = mode === "remain" || mode === "remainPct";
+  const isRemainMode = dual || mode === "remain" || mode === "remainPct";
   const totalIssued = TEAM_COL_ORDER.reduce((s, tk) => s + stats.byTeam[tk].issued, 0);
   const rectReady =
     isRemainMode &&
@@ -136,117 +137,136 @@ function TeamCells({
     totalIssued > 0 &&
     TEAM_COL_ORDER.every((tk) => stats.byTeam[tk].issued - stats.byTeam[tk].closed <= 0);
 
+  /** Each Date 전용 모드(숫자 → 날짜 대체) */
+  const dateOnly = !!stageDate && !dual;
+
+  const renderCell = (
+    sc: (typeof STATUS_COLS)[number],
+    sIdx: number,
+    team: TeamKey,
+    tIdx: number,
+    kind: "num" | "date",
+    isFirstOfGroup: boolean,
+    isSubgroupStart: boolean,
+  ) => {
+    const t = stats.byTeam[team];
+    const done = sc.slot === "issued" ? t.issued : t[sc.slot];
+    const isStageSlot = sc.slot !== "issued";
+    const useRemain = isRemainMode;
+    const count = useRemain && isStageSlot ? Math.max(0, t.issued - done) : done;
+    const ratio = t.issued > 0 && isStageSlot ? (count / t.issued) * 100 : null;
+    const showPct = !dual && (mode === "pct" || mode === "remainPct") && isStageSlot;
+    const text = showPct ? (ratio == null ? "–" : `${Math.round(ratio)}%`) : count.toLocaleString();
+    const isBottleneck = isStageSlot && bottlenecks[sc.slot] === team;
+    const readyTone =
+      sc.slot === "rect" && rectReady
+        ? "ready-inspection"
+        : sc.slot === "closed" && closedReady
+          ? "ready-handover"
+          : null;
+    const zeroDim = !showPct && count === 0 ? "text-muted-foreground/50" : "text-foreground";
+
+    // 날짜: 스테이지 완료(잔여 0) → 실적일 + 회색 반전, 그 외 → 계획일
+    const wantDate = kind === "date" || dateOnly;
+    const stageDone = wantDate && isStageSlot && t.issued > 0 && t.issued - done <= 0;
+    const dateValue =
+      wantDate && isStageSlot && stageDate
+        ? stageDate(sc.slot as StageMetric, team, stageDone ? "actual" : "planned")
+        : null;
+    const dateText = wantDate ? (isStageSlot ? formatHoDate(dateValue) : "–") : null;
+
+    const readyBg =
+      wantDate && stageDone
+        ? "color-mix(in oklab, var(--muted) 90%, var(--card))"
+        : kind === "num" && readyTone === "ready-inspection"
+          ? "color-mix(in oklab, var(--color-sky-400) 30%, var(--card))"
+          : kind === "num" && readyTone === "ready-handover"
+            ? "color-mix(in oklab, var(--color-emerald-400) 30%, var(--card))"
+            : null;
+    const showBottleneckBg = isBottleneck && !readyBg && kind === "num" && !dateOnly;
+
+    return (
+      <td
+        key={`${sc.slot}-${team}-${kind}`}
+        className={cn(
+          "h-7 border-b p-0 tabular-nums",
+          (dateOnly || kind === "date") && "min-w-[54px]",
+          stickyTop === undefined && !readyBg && groupBg,
+          stickyTop !== undefined && "sticky z-20",
+          isFirstOfGroup && "border-l-2 border-l-border",
+          !isFirstOfGroup && isSubgroupStart && "border-l border-l-border/70",
+          !isSubgroupStart && "border-r border-r-border/30",
+          showBottleneckBg && "bg-destructive/15",
+          dim && "opacity-50",
+        )}
+        style={
+          stickyTop !== undefined
+            ? { top: stickyTop, background: readyBg ?? (showBottleneckBg ? undefined : stickyBg) }
+            : readyBg
+              ? { background: readyBg }
+              : undefined
+        }
+      >
+        <button
+          type="button"
+          onClick={() => onCell(sc.slot, team)}
+          title={`${team} ${sc.label}: ${count.toLocaleString()}${
+            ratio != null ? ` (${Math.round(ratio)}%)` : ""
+          }${isBottleneck ? " · 병목" : ""}${
+            readyTone === "ready-inspection"
+              ? " · Ready for Inspection"
+              : readyTone === "ready-handover"
+                ? " · Ready for Handover"
+                : ""
+          }${
+            wantDate && isStageSlot
+              ? ` · ${stageDone ? "실적일" : "계획일"} ${dateValue ?? "없음"}`
+              : ""
+          }`}
+          className={cn(
+            "block h-full w-full px-1 leading-none hover:bg-primary/10",
+            kind === "date" || dateOnly ? "text-center text-[10px]" : "text-right text-xs",
+            kind === "num" && !dateOnly && sc.slot === "issued" && !isTotal && "font-medium",
+            kind === "date" || dateOnly
+              ? stageDone
+                ? "text-muted-foreground"
+                : dateValue
+                  ? "text-foreground"
+                  : "text-muted-foreground/50"
+              : showPct
+                ? isRemainMode
+                  ? remainPctTone(ratio)
+                  : pctTone(ratio)
+                : zeroDim,
+            kind === "num" && !dateOnly && isBottleneck && !isTotal && "font-semibold",
+            kind === "num" && !dateOnly && readyTone && !isTotal && "font-semibold text-foreground",
+            isTotal && "font-bold",
+          )}
+        >
+          {kind === "date" || dateOnly ? dateText : text}
+        </button>
+      </td>
+    );
+  };
+
   return (
     <>
-      {STATUS_COLS.map((sc, sIdx) =>
-        TEAM_COL_ORDER.map((team, tIdx) => {
-          const t = stats.byTeam[team];
-          const done = sc.slot === "issued" ? t.issued : t[sc.slot];
-          const isRemain = mode === "remain" || mode === "remainPct";
-          const count =
-            isRemain && sc.slot !== "issued" ? Math.max(0, t.issued - done) : done;
-          const ratio = t.issued > 0 && sc.slot !== "issued" ? (count / t.issued) * 100 : null;
-          const showPct = (mode === "pct" || mode === "remainPct") && sc.slot !== "issued";
-          const text = showPct
-            ? ratio == null
-              ? "–"
-              : `${Math.round(ratio)}%`
-            : count.toLocaleString();
-          const isBottleneck = sc.slot !== "issued" && bottlenecks[sc.slot] === team;
-          const readyTone =
-            sc.slot === "rect" && rectReady
-              ? "ready-inspection"
-              : sc.slot === "closed" && closedReady
-                ? "ready-handover"
-                : null;
-          const isFirstOfGroup = sIdx === 0 && tIdx === 0;
-          const isFirstOfStatus = tIdx === 0;
-          const zeroDim = !showPct && count === 0 ? "text-muted-foreground/50" : "text-foreground";
-          // Each Date 모드: 스테이지 완료(잔여 0) → 실적일 + 회색 반전, 그 외 → 계획일
-          const eachDate = !!stageDate;
-          const isStageSlot = sc.slot !== "issued";
-          const stageDone = eachDate && isStageSlot && t.issued > 0 && t.issued - done <= 0;
-          const dateValue =
-            eachDate && isStageSlot
-              ? stageDate!(sc.slot as StageMetric, team, stageDone ? "actual" : "planned")
-              : null;
-          const dateText = eachDate ? (isStageSlot ? formatHoDate(dateValue) : "–") : null;
-          const readyBg =
-            eachDate && stageDone
-              ? "color-mix(in oklab, var(--muted) 90%, var(--card))"
-              :
-            readyTone === "ready-inspection"
-              ? "color-mix(in oklab, var(--color-sky-400) 30%, var(--card))"
-              : readyTone === "ready-handover"
-                ? "color-mix(in oklab, var(--color-emerald-400) 30%, var(--card))"
-                : null;
-          return (
-            <td
-              key={`${sc.slot}-${team}`}
-              className={cn(
-                "h-7 border-b p-0 tabular-nums",
-                eachDate && "min-w-[54px]",
-                stickyTop === undefined && !readyBg && groupBg,
-                stickyTop !== undefined && "sticky z-20",
-                isFirstOfGroup && "border-l-2 border-l-border",
-                !isFirstOfGroup && isFirstOfStatus && "border-l border-l-border/70",
-                !isFirstOfStatus && "border-r border-r-border/30",
-                isBottleneck && !readyBg && !eachDate && "bg-destructive/15",
-                dim && "opacity-50",
-              )}
-              style={
-                stickyTop !== undefined
-                  ? { top: stickyTop, background: readyBg ?? (isBottleneck ? undefined : stickyBg) }
-                  : readyBg
-                    ? { background: readyBg }
-                    : undefined
-              }
-            >
-              <button
-                type="button"
-                onClick={() => onCell(sc.slot, team)}
-                title={`${team} ${sc.label}: ${count.toLocaleString()}${
-                  ratio != null ? ` (${Math.round(ratio)}%)` : ""
-                }${isBottleneck ? " · 병목" : ""}${
-                  readyTone === "ready-inspection"
-                    ? " · Ready for Inspection"
-                    : readyTone === "ready-handover"
-                      ? " · Ready for Handover"
-                      : ""
-                }${
-                  eachDate && isStageSlot
-                    ? ` · ${stageDone ? "실적일" : "계획일"} ${dateValue ?? "없음"}`
-                    : ""
-                }`}
-                className={cn(
-                  "block h-full w-full px-1 leading-none hover:bg-primary/10",
-                  eachDate ? "text-center text-[10px]" : "text-right text-xs",
-                  !eachDate && sc.slot === "issued" && !isTotal && "font-medium",
-                  eachDate
-                    ? stageDone
-                      ? "text-muted-foreground"
-                      : dateValue
-                        ? "text-foreground"
-                        : "text-muted-foreground/50"
-                    : showPct
-                      ? isRemain
-                        ? remainPctTone(ratio)
-                        : pctTone(ratio)
-                      : zeroDim,
-                  !eachDate && isBottleneck && !isTotal && "font-semibold",
-                  !eachDate && readyTone && !isTotal && "font-semibold text-foreground",
-                  isTotal && "font-bold",
-                )}
-              >
-                {eachDate ? dateText : text}
-              </button>
-            </td>
-          );
-        }),
-      )}
+      {STATUS_COLS.map((sc, sIdx) => (
+        <Fragment key={`slot-${sc.slot}`}>
+          {TEAM_COL_ORDER.map((team, tIdx) =>
+            renderCell(sc, sIdx, team, tIdx, "num", sIdx === 0 && tIdx === 0, tIdx === 0),
+          )}
+          {dual &&
+            sc.slot !== "issued" &&
+            TEAM_COL_ORDER.map((team, tIdx) =>
+              renderCell(sc, sIdx, team, tIdx, "date", false, tIdx === 0),
+            )}
+        </Fragment>
+      ))}
     </>
   );
 }
+
 
 /** Three-row header: Room Group → Status → Team. */
 function MatrixHeader({
