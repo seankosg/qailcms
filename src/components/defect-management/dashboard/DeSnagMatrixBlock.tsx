@@ -268,19 +268,21 @@ function TeamCells({
 }
 
 
-/** Three-row header: Room Group → Status → Team. */
+/** Header: Room Group → Status → (잔여/Date) → Team. */
 function MatrixHeader({
   block,
   buildingParam,
   onNavigate,
   showHoDate,
   srcRG,
+  dual,
 }: {
   block: MatrixBlock;
   buildingParam: Record<string, string>;
   onNavigate: (p: Record<string, string>) => void;
   showHoDate: boolean;
   srcRG: (col: string) => string;
+  dual: boolean;
 }) {
   const groups: Array<{ key: string; label: string; isTotal?: boolean; isNa?: boolean }> = [
     ...block.columnKeys.map((rg) => ({ key: rg as string, label: rg as string, isNa: rg === "N/A" })),
