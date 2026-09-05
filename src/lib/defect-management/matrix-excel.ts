@@ -385,9 +385,12 @@ export function exportSnagMatrixToXlsx(args: {
     ws["!cols"] = [
       { wch: 16 },
       { wch: 14 },
-      ...Array.from({ length: totalCols - 2 }, (_, i) =>
-        showHoDate && i % GROUP_SPAN === perGroup ? { wch: 9 } : { wch: 7 },
-      ),
+      ...Array.from({ length: totalCols - 2 }, (_, i) => {
+        if (showHoDate && i % GROUP_SPAN === perGroup) return { wch: 9 };
+        if (eachDate && Math.floor((i % GROUP_SPAN) / TEAM_COL_ORDER.length) > 0)
+          return { wch: 9 };
+        return { wch: 7 };
+      }),
     ];
     ws["!rows"] = dual
       ? [{ hpt: 22 }, { hpt: 18 }, { hpt: 6 }, { hpt: 20 }, { hpt: 16 }, { hpt: 16 }, { hpt: 16 }]
