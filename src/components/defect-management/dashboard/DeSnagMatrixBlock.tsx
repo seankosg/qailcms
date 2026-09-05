@@ -350,7 +350,11 @@ function MatrixHeader({
           {STATUS_COLS.map((sc, sIdx) => (
             <th
               key={`${g.key}-${sc.slot}`}
-              colSpan={TEAM_COL_ORDER.length}
+              colSpan={
+                dual && sc.slot !== "issued"
+                  ? TEAM_COL_ORDER.length * 2
+                  : TEAM_COL_ORDER.length
+              }
               className={cn(
                 "sticky top-[30px] z-30 h-6 border-b px-1 text-center text-[10px] font-semibold uppercase tracking-wide text-muted-foreground",
                 sIdx === 0 && "border-l-2 border-l-border",
@@ -364,7 +368,7 @@ function MatrixHeader({
           {showHoDate && (
             <th
               key={`${g.key}-hodate`}
-              rowSpan={2}
+              rowSpan={dual ? 3 : 2}
               className="sticky top-[30px] z-30 min-w-[52px] border-b border-l border-l-border/70 px-1 text-center text-[10px] font-semibold uppercase tracking-wide text-muted-foreground"
               style={{ background: groupBg(g, idx) }}
             >
@@ -374,25 +378,54 @@ function MatrixHeader({
           </Fragment>
         ))}
       </tr>
+      {/* Tier 2b: 잔여 / Date (잔여+Date 모드 전용) */}
+      {dual && (
+        <tr>
+          {groups.map((g, idx) =>
+            STATUS_COLS.map((sc, sIdx) =>
+              (sc.slot === "issued" ? (["num"] as const) : (["num", "date"] as const)).map(
+                (kind) => (
+                  <th
+                    key={`${g.key}-${sc.slot}-${kind}`}
+                    colSpan={TEAM_COL_ORDER.length}
+                    className={cn(
+                      "sticky top-[54px] z-30 h-6 border-b px-1 text-center text-[10px] font-medium uppercase tracking-wide text-muted-foreground",
+                      sIdx === 0 && kind === "num" && "border-l-2 border-l-border",
+                      !(sIdx === 0 && kind === "num") && "border-l border-l-border/70",
+                    )}
+                    style={{ background: groupBg(g, idx) }}
+                  >
+                    {sc.slot === "issued" ? "개수" : kind === "num" ? "잔여" : "Date"}
+                  </th>
+                ),
+              ),
+            ),
+          )}
+        </tr>
+      )}
       {/* Tier 3: Team */}
       <tr>
         {groups.map((g, idx) =>
           STATUS_COLS.map((sc, sIdx) =>
-            TEAM_COL_ORDER.map((team, tIdx) => (
-              <th
-                key={`${g.key}-${sc.slot}-${team}`}
-                className={cn(
-                  "sticky top-[54px] z-30 h-6 min-w-[40px] border-b px-1 text-right text-[10px] font-medium uppercase tracking-wide text-muted-foreground",
-                  sIdx === 0 && tIdx === 0 && "border-l-2 border-l-border",
-                  !(sIdx === 0 && tIdx === 0) && tIdx === 0 && "border-l border-l-border/70",
-                  tIdx !== 0 && "border-r border-r-border/30",
-                )}
-                style={{ background: groupBg(g, idx) }}
-                title={`${sc.label} · ${team}`}
-              >
-                {team === "ELEC" ? "Elec" : team === "MECH" ? "Mech" : "Arch"}
-              </th>
-            )),
+            (dual && sc.slot !== "issued" ? (["num", "date"] as const) : (["num"] as const)).map(
+              (kind) =>
+                TEAM_COL_ORDER.map((team, tIdx) => (
+                  <th
+                    key={`${g.key}-${sc.slot}-${kind}-${team}`}
+                    className={cn(
+                      "sticky z-30 h-6 min-w-[40px] border-b px-1 text-[10px] font-medium uppercase tracking-wide text-muted-foreground",
+                      kind === "date" ? "text-center" : "text-right",
+                      sIdx === 0 && kind === "num" && tIdx === 0 && "border-l-2 border-l-border",
+                      !(sIdx === 0 && kind === "num") && tIdx === 0 && "border-l border-l-border/70",
+                      tIdx !== 0 && "border-r border-r-border/30",
+                    )}
+                    style={{ background: groupBg(g, idx), top: TEAM_ROW_TOP(dual) }}
+                    title={`${sc.label} · ${team}${kind === "date" ? " · Date" : ""}`}
+                  >
+                    {team === "ELEC" ? "Elec" : team === "MECH" ? "Mech" : "Arch"}
+                  </th>
+                )),
+            ),
           ),
         )}
       </tr>
