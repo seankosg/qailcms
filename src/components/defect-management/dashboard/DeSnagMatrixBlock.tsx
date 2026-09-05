@@ -175,15 +175,20 @@ function TeamCells({
         ? stageDate(sc.slot as StageMetric, team, stageDone ? "actual" : "planned")
         : null;
     const dateText = wantDate ? (isStageSlot ? formatHoDate(dateValue) : "–") : null;
+    // Overdue: 미완료(잔여 > 0)인데 계획일이 도하 기준 오늘보다 과거
+    const overdue =
+      wantDate && isStageSlot && !stageDone && dateValue != null && dateValue < today;
 
     const readyBg =
       wantDate && stageDone
         ? "color-mix(in oklab, var(--muted) 90%, var(--card))"
-        : kind === "num" && readyTone === "ready-inspection"
-          ? "color-mix(in oklab, var(--color-sky-400) 30%, var(--card))"
-          : kind === "num" && readyTone === "ready-handover"
-            ? "color-mix(in oklab, var(--color-emerald-400) 30%, var(--card))"
-            : null;
+        : overdue
+          ? "color-mix(in oklab, var(--destructive) 28%, var(--card))"
+          : kind === "num" && readyTone === "ready-inspection"
+            ? "color-mix(in oklab, var(--color-sky-400) 30%, var(--card))"
+            : kind === "num" && readyTone === "ready-handover"
+              ? "color-mix(in oklab, var(--color-emerald-400) 30%, var(--card))"
+              : null;
     const showBottleneckBg = isBottleneck && !readyBg && kind === "num" && !dateOnly;
 
     return (
