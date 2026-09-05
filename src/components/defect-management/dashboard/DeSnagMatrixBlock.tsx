@@ -125,6 +125,7 @@ function TeamCells({
 
   const bottlenecks: Partial<Record<StatusSlot, TeamKey | null>> = {};
   for (const m of STAGE_METRICS) bottlenecks[m.slot] = bottleneckTeam(stats.byTeam, m.slot);
+  const today = todayInDoha();
 
   // 잔여 모드 전용 Room Group 단위 상태 하이라이트
   const isRemainMode = dual || mode === "remain" || mode === "remainPct";
