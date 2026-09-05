@@ -49,9 +49,20 @@ De-Snagging Matrix에 **잔여 개수와 Each Date를 한 화면에 동시 표�
 - 드릴다운: 잔여 셀·Date 셀 모두 기존 `goCell(slot, team)`과 동일 파라미터(`dateField` + as-of 상한)로 Raw Data 이동
 - 툴팁: Date 셀은 `TEAM Stage: 잔여 N · 계획일/실적일 dd/mmm` 형태
 
-### 5. 범위 외 (변경하지 않음)
+### 5. 엑셀 내보내기 반영
 
-- 엑셀보내기(`matrix-excel.ts`)는 현행 유지 (remainDate 레이아웃 미반영 — 필요 시 별도 티켓)
+`src/lib/defect-management/matrix-excel.ts`(`exportSnagMatrixToXlsx`)에 `remainDate` · `stageDates` 인자를 추가해 **화면과 동일한 열 구조**로 내보낸다.
+
+- 그룹당 열 수(`PER_GROUP`)를 remainDate 모드에서 33열로 확장: Issued 3 + Stage 5 × (잔여 3 + Date 3)
+- 헤더 3단 → 4단(Room Group / Stage / 잔여·Date / 팀) 병합 셀 생성
+- 값 규칙은 화면과 동일: 잔여는 숫자, Date는 `dd/mmm` 문자열(완료 시 실적일, 그 외 계획일, 없으면 `–`)
+- 열 너비: Date 열 9, 잔여 열 7
+- 파일명 태그 `REMAIN-DATE` → `CMS_SM_Dashboard_Matrix_PLOT-C_REMAIN-DATE_{asOf}.xlsx`
+- 기존 count/pct/remain/remainPct 및 HO Date 내보내기 동작은 그대로 유지
+
+### 6. 범위 외 (변경하지 않음)
+
+
 - `HO Date` / `Each Date` 기존 동작, RPC(`defect_snag_stage_dates_json`), `stage-dates.ts` 조립 로직 그대로 재사용
 - Grand Total 카드·Room Group 카드·필터바 변경 없음
 
