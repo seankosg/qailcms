@@ -140,7 +140,9 @@ export function exportSnagMatrixToXlsx(args: {
       `표기: ${
         dual
           ? "잔여 개수 + 스테이지 날짜(계획일 / 완료 시 실적일)"
-          : mode === "pct"
+          : eachDate
+            ? "스테이지 날짜 (계획일 / 완료 시 실적일)"
+            : mode === "pct"
           ? "% (Rect/Closed = 같은 팀 Issued 대비)"
           : mode === "remain"
             ? "잔여 개수 (Issued − 실적)"
