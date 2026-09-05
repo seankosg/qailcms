@@ -400,7 +400,9 @@ export function exportSnagMatrixToXlsx(args: {
 
   const modeTag = dual
     ? "REMAIN-DATE"
-    : mode === "pct" ? "PCT" : mode === "remain" ? "REMAIN" : mode === "remainPct" ? "REMAIN-PCT" : "COUNT";
+    : eachDate
+      ? "EACH-DATE"
+      : mode === "pct" ? "PCT" : mode === "remain" ? "REMAIN" : mode === "remainPct" ? "REMAIN-PCT" : "COUNT";
   const fileName = `CMS_SM_Dashboard_Matrix_PLOT-${matrix.plot}_${modeTag}_${asOf}.xlsx`;
   XLSX.writeFile(wb, fileName);
 }
