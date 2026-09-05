@@ -96,7 +96,12 @@ export function DeSnagDashboardPage() {
     navigate({
       to: "/closure/snag-management/dashboard",
       search: (prev: Record<string, unknown>) =>
-        ({ ...prev, hoDate: v ? 1 : 0, eachDate: v ? 0 : (prev as any).eachDate ?? 0 }) as any,
+        ({
+          ...prev,
+          hoDate: v ? 1 : 0,
+          eachDate: v ? 0 : ((prev as any).eachDate ?? 0),
+          remainDate: v ? 0 : ((prev as any).remainDate ?? 0),
+        }) as any,
     });
   const { data: hoRows = [] } = useSnagHoDates(
     appliedPlot,
@@ -115,22 +120,41 @@ export function DeSnagDashboardPage() {
     return buildHoDateMap(rows);
   }, [showHoDate, hoRows, appliedRoomGroups]);
 
+  // 잔여+Date — 스테이지별 [부서 잔여 3열 → 부서 Date 3열] 병기 (HO Date · Each Date 와 상호 배타)
+  const remainDate = ((search as any).remainDate ?? 0) === 1;
+  const setRemainDate = (v: boolean) =>
+    navigate({
+      to: "/closure/snag-management/dashboard",
+      search: (prev: Record<string, unknown>) =>
+        ({
+          ...prev,
+          remainDate: v ? 1 : 0,
+          hoDate: v ? 0 : ((prev as any).hoDate ?? 0),
+          eachDate: v ? 0 : ((prev as any).eachDate ?? 0),
+        }) as any,
+    });
+
   // Each Date — 셀 값을 스테이지별 계획일/실적일(dd/mmm)로 대체 (HO Date 와 상호 배타)
   const eachDate = ((search as any).eachDate ?? 0) === 1;
   const setEachDate = (v: boolean) =>
     navigate({
       to: "/closure/snag-management/dashboard",
       search: (prev: Record<string, unknown>) =>
-        ({ ...prev, eachDate: v ? 1 : 0, hoDate: v ? 0 : (prev as any).hoDate ?? 0 }) as any,
+        ({
+          ...prev,
+          eachDate: v ? 1 : 0,
+          hoDate: v ? 0 : ((prev as any).hoDate ?? 0),
+          remainDate: v ? 0 : ((prev as any).remainDate ?? 0),
+        }) as any,
     });
   const { data: stageRows = [] } = useSnagStageDates(
     appliedPlot,
     appliedTeams,
     effectiveDataDate || null,
-    eachDate,
+    eachDate || remainDate,
   );
   const stageDates = useMemo(() => {
-    if (!eachDate) return EMPTY_STAGE_DATE_MAP;
+    if (!eachDate && !remainDate) return EMPTY_STAGE_DATE_MAP;
     const rows =
       appliedRoomGroups.length === 0
         ? stageRows
@@ -138,7 +162,7 @@ export function DeSnagDashboardPage() {
             new Set<RoomGroupCol>(appliedRoomGroups).has(normalizeRoomGroup(r.room_group)),
           );
     return buildStageDateMap(rows);
-  }, [eachDate, stageRows, appliedRoomGroups]);
+  }, [eachDate, remainDate, stageRows, appliedRoomGroups]);
 
   const teamsStr = search.teams ?? "";
   const rgStr = search.roomGroups ?? "";
@@ -364,16 +388,16 @@ export function DeSnagDashboardPage() {
           </TabsList>
         </Tabs>
         <Tabs
-          value={isRemainMode ? "" : matrixMode}
+          value={remainDate ? "" : isRemainMode ? "" : matrixMode}
           onValueChange={(v) => v && setMatrixMode(v as MatrixMode)}
         >
           <TabsList className="h-8">
-            <TabsTrigger value="count" className="text-xs">개수</TabsTrigger>
-            <TabsTrigger value="pct" className="text-xs">%</TabsTrigger>
+            <TabsTrigger value="count" className="text-xs" disabled={remainDate}>개수</TabsTrigger>
+            <TabsTrigger value="pct" className="text-xs" disabled={remainDate}>%</TabsTrigger>
           </TabsList>
         </Tabs>
         <Tabs
-          value={isRemainMode ? matrixMode : ""}
+          value={remainDate ? "remain" : isRemainMode ? matrixMode : ""}
           onValueChange={(v) => v && setMatrixMode(v as MatrixMode)}
         >
           <TabsList className="h-8 bg-amber-500/15">
@@ -386,6 +410,7 @@ export function DeSnagDashboardPage() {
             <TabsTrigger
               value="remainPct"
               className="text-xs data-[state=active]:bg-amber-500 data-[state=active]:text-white"
+              disabled={remainDate}
             >
               잔여 %
             </TabsTrigger>
@@ -401,6 +426,12 @@ export function DeSnagDashboardPage() {
           <Switch id="each-date-toggle" checked={eachDate} onCheckedChange={setEachDate} />
           <Label htmlFor="each-date-toggle" className="cursor-pointer text-xs">
             Each Date
+          </Label>
+        </div>
+        <div className="flex items-center gap-1.5">
+          <Switch id="remain-date-toggle" checked={remainDate} onCheckedChange={setRemainDate} />
+          <Label htmlFor="remain-date-toggle" className="cursor-pointer text-xs">
+            잔여+Date
           </Label>
         </div>
         <Button
@@ -419,6 +450,8 @@ export function DeSnagDashboardPage() {
                 roomGroupsFilter: appliedRoomGroups,
                 showHoDate,
                 hoDates,
+                remainDate,
+                stageDates,
               });
               toast.success("매트릭스를 엑셀로 내보냈습니다.");
             } catch (e) {
@@ -447,6 +480,7 @@ export function DeSnagDashboardPage() {
             showHoDate={showHoDate}
             hoDates={hoDates}
             eachDate={eachDate}
+            remainDate={remainDate}
             stageDates={stageDates}
           />
         ))}

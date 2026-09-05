@@ -34,6 +34,14 @@ const STATUS_COLS: Array<{ slot: StatusSlot; label: string }> = [
 ];
 
 const COLS_PER_GROUP = STATUS_COLS.length * TEAM_COL_ORDER.length; // 6 slots × 3 teams
+/** 잔여+Date 모드: Issued 3열 + 스테이지 5개 × (잔여 3 + Date 3) */
+const COLS_PER_GROUP_DUAL =
+  TEAM_COL_ORDER.length + STAGE_METRICS.length * TEAM_COL_ORDER.length * 2;
+const perGroupCols = (dual: boolean) => (dual ? COLS_PER_GROUP_DUAL : COLS_PER_GROUP);
+/** sticky 헤더 오프셋 — 4단(잔여+Date)일 때 한 단(24px) 더 내려간다 */
+const TEAM_ROW_TOP = (dual: boolean) => (dual ? 78 : 54);
+const TOTAL_ROW_TOP = (dual: boolean) => (dual ? 102 : 78);
+
 
 /** HO Planned Date (dd/mmm) 셀 */
 function HoCell({
@@ -83,7 +91,7 @@ function remainPctTone(pct: number | null): string {
   return pctTone(100 - pct);
 }
 
-/** Render 9 team-decomposed <td> cells (Issued/Rect/Closed × Elec/Mech/Arch). */
+/** Render team-decomposed <td> cells (Issued/Stage × Elec/Mech/Arch, 잔여+Date 모드에서는 Date 열 추가). */
 function TeamCells({
   stats,
   mode,
@@ -93,6 +101,7 @@ function TeamCells({
   isTotal,
   stickyTop,
   stageDate,
+  dual,
 }: {
   stats: Stats;
   mode: MatrixMode;
@@ -101,8 +110,10 @@ function TeamCells({
   groupIndex: number;
   isTotal?: boolean;
   stickyTop?: number;
-  /** 지정되면 Each Date 모드 — 숫자 대신 날짜(dd/mmm)를 표시한다 */
+  /** 지정되면 날짜 조회 가능 — Each Date(대체) 또는 잔여+Date(병기) */
   stageDate?: StageDateLookup;
+  /** true = 잔여 개수와 Date 를 나란히 표시 */
+  dual?: boolean;
 }) {
   const groupBg = isTotal ? "bg-yellow-400/10" : groupIndex % 2 === 0 ? "bg-transparent" : "bg-muted/20";
   const stickyBg = isTotal
@@ -115,9 +126,7 @@ function TeamCells({
   for (const m of STAGE_METRICS) bottlenecks[m.slot] = bottleneckTeam(stats.byTeam, m.slot);
 
   // 잔여 모드 전용 Room Group 단위 상태 하이라이트
-  // Rect 잔여가 3개 팀 모두 0 → Ready for Inspection(하늘색)
-  // Closed 잔여가 3개 팀 모두 0 → Ready for Handover(초록색)
-  const isRemainMode = mode === "remain" || mode === "remainPct";
+  const isRemainMode = dual || mode === "remain" || mode === "remainPct";
   const totalIssued = TEAM_COL_ORDER.reduce((s, tk) => s + stats.byTeam[tk].issued, 0);
   const rectReady =
     isRemainMode &&
@@ -128,131 +137,152 @@ function TeamCells({
     totalIssued > 0 &&
     TEAM_COL_ORDER.every((tk) => stats.byTeam[tk].issued - stats.byTeam[tk].closed <= 0);
 
+  /** Each Date 전용 모드(숫자 → 날짜 대체) */
+  const dateOnly = !!stageDate && !dual;
+
+  const renderCell = (
+    sc: (typeof STATUS_COLS)[number],
+    sIdx: number,
+    team: TeamKey,
+    tIdx: number,
+    kind: "num" | "date",
+    isFirstOfGroup: boolean,
+    isSubgroupStart: boolean,
+  ) => {
+    const t = stats.byTeam[team];
+    const done = sc.slot === "issued" ? t.issued : t[sc.slot];
+    const isStageSlot = sc.slot !== "issued";
+    const useRemain = isRemainMode;
+    const count = useRemain && isStageSlot ? Math.max(0, t.issued - done) : done;
+    const ratio = t.issued > 0 && isStageSlot ? (count / t.issued) * 100 : null;
+    const showPct = !dual && (mode === "pct" || mode === "remainPct") && isStageSlot;
+    const text = showPct ? (ratio == null ? "–" : `${Math.round(ratio)}%`) : count.toLocaleString();
+    const isBottleneck = isStageSlot && bottlenecks[sc.slot] === team;
+    const readyTone =
+      sc.slot === "rect" && rectReady
+        ? "ready-inspection"
+        : sc.slot === "closed" && closedReady
+          ? "ready-handover"
+          : null;
+    const zeroDim = !showPct && count === 0 ? "text-muted-foreground/50" : "text-foreground";
+
+    // 날짜: 스테이지 완료(잔여 0) → 실적일 + 회색 반전, 그 외 → 계획일
+    const wantDate = kind === "date" || dateOnly;
+    const stageDone = wantDate && isStageSlot && t.issued > 0 && t.issued - done <= 0;
+    const dateValue =
+      wantDate && isStageSlot && stageDate
+        ? stageDate(sc.slot as StageMetric, team, stageDone ? "actual" : "planned")
+        : null;
+    const dateText = wantDate ? (isStageSlot ? formatHoDate(dateValue) : "–") : null;
+
+    const readyBg =
+      wantDate && stageDone
+        ? "color-mix(in oklab, var(--muted) 90%, var(--card))"
+        : kind === "num" && readyTone === "ready-inspection"
+          ? "color-mix(in oklab, var(--color-sky-400) 30%, var(--card))"
+          : kind === "num" && readyTone === "ready-handover"
+            ? "color-mix(in oklab, var(--color-emerald-400) 30%, var(--card))"
+            : null;
+    const showBottleneckBg = isBottleneck && !readyBg && kind === "num" && !dateOnly;
+
+    return (
+      <td
+        key={`${sc.slot}-${team}-${kind}`}
+        className={cn(
+          "h-7 border-b p-0 tabular-nums",
+          (dateOnly || kind === "date") && "min-w-[54px]",
+          stickyTop === undefined && !readyBg && groupBg,
+          stickyTop !== undefined && "sticky z-20",
+          isFirstOfGroup && "border-l-2 border-l-border",
+          !isFirstOfGroup && isSubgroupStart && "border-l border-l-border/70",
+          !isSubgroupStart && "border-r border-r-border/30",
+          showBottleneckBg && "bg-destructive/15",
+          dim && "opacity-50",
+        )}
+        style={
+          stickyTop !== undefined
+            ? { top: stickyTop, background: readyBg ?? (showBottleneckBg ? undefined : stickyBg) }
+            : readyBg
+              ? { background: readyBg }
+              : undefined
+        }
+      >
+        <button
+          type="button"
+          onClick={() => onCell(sc.slot, team)}
+          title={`${team} ${sc.label}: ${count.toLocaleString()}${
+            ratio != null ? ` (${Math.round(ratio)}%)` : ""
+          }${isBottleneck ? " · 병목" : ""}${
+            readyTone === "ready-inspection"
+              ? " · Ready for Inspection"
+              : readyTone === "ready-handover"
+                ? " · Ready for Handover"
+                : ""
+          }${
+            wantDate && isStageSlot
+              ? ` · ${stageDone ? "실적일" : "계획일"} ${dateValue ?? "없음"}`
+              : ""
+          }`}
+          className={cn(
+            "block h-full w-full px-1 leading-none hover:bg-primary/10",
+            kind === "date" || dateOnly ? "text-center text-[10px]" : "text-right text-xs",
+            kind === "num" && !dateOnly && sc.slot === "issued" && !isTotal && "font-medium",
+            kind === "date" || dateOnly
+              ? stageDone
+                ? "text-muted-foreground"
+                : dateValue
+                  ? "text-foreground"
+                  : "text-muted-foreground/50"
+              : showPct
+                ? isRemainMode
+                  ? remainPctTone(ratio)
+                  : pctTone(ratio)
+                : zeroDim,
+            kind === "num" && !dateOnly && isBottleneck && !isTotal && "font-semibold",
+            kind === "num" && !dateOnly && readyTone && !isTotal && "font-semibold text-foreground",
+            isTotal && "font-bold",
+          )}
+        >
+          {kind === "date" || dateOnly ? dateText : text}
+        </button>
+      </td>
+    );
+  };
+
   return (
     <>
-      {STATUS_COLS.map((sc, sIdx) =>
-        TEAM_COL_ORDER.map((team, tIdx) => {
-          const t = stats.byTeam[team];
-          const done = sc.slot === "issued" ? t.issued : t[sc.slot];
-          const isRemain = mode === "remain" || mode === "remainPct";
-          const count =
-            isRemain && sc.slot !== "issued" ? Math.max(0, t.issued - done) : done;
-          const ratio = t.issued > 0 && sc.slot !== "issued" ? (count / t.issued) * 100 : null;
-          const showPct = (mode === "pct" || mode === "remainPct") && sc.slot !== "issued";
-          const text = showPct
-            ? ratio == null
-              ? "–"
-              : `${Math.round(ratio)}%`
-            : count.toLocaleString();
-          const isBottleneck = sc.slot !== "issued" && bottlenecks[sc.slot] === team;
-          const readyTone =
-            sc.slot === "rect" && rectReady
-              ? "ready-inspection"
-              : sc.slot === "closed" && closedReady
-                ? "ready-handover"
-                : null;
-          const isFirstOfGroup = sIdx === 0 && tIdx === 0;
-          const isFirstOfStatus = tIdx === 0;
-          const zeroDim = !showPct && count === 0 ? "text-muted-foreground/50" : "text-foreground";
-          // Each Date 모드: 스테이지 완료(잔여 0) → 실적일 + 회색 반전, 그 외 → 계획일
-          const eachDate = !!stageDate;
-          const isStageSlot = sc.slot !== "issued";
-          const stageDone = eachDate && isStageSlot && t.issued > 0 && t.issued - done <= 0;
-          const dateValue =
-            eachDate && isStageSlot
-              ? stageDate!(sc.slot as StageMetric, team, stageDone ? "actual" : "planned")
-              : null;
-          const dateText = eachDate ? (isStageSlot ? formatHoDate(dateValue) : "–") : null;
-          const readyBg =
-            eachDate && stageDone
-              ? "color-mix(in oklab, var(--muted) 90%, var(--card))"
-              :
-            readyTone === "ready-inspection"
-              ? "color-mix(in oklab, var(--color-sky-400) 30%, var(--card))"
-              : readyTone === "ready-handover"
-                ? "color-mix(in oklab, var(--color-emerald-400) 30%, var(--card))"
-                : null;
-          return (
-            <td
-              key={`${sc.slot}-${team}`}
-              className={cn(
-                "h-7 border-b p-0 tabular-nums",
-                eachDate && "min-w-[54px]",
-                stickyTop === undefined && !readyBg && groupBg,
-                stickyTop !== undefined && "sticky z-20",
-                isFirstOfGroup && "border-l-2 border-l-border",
-                !isFirstOfGroup && isFirstOfStatus && "border-l border-l-border/70",
-                !isFirstOfStatus && "border-r border-r-border/30",
-                isBottleneck && !readyBg && !eachDate && "bg-destructive/15",
-                dim && "opacity-50",
-              )}
-              style={
-                stickyTop !== undefined
-                  ? { top: stickyTop, background: readyBg ?? (isBottleneck ? undefined : stickyBg) }
-                  : readyBg
-                    ? { background: readyBg }
-                    : undefined
-              }
-            >
-              <button
-                type="button"
-                onClick={() => onCell(sc.slot, team)}
-                title={`${team} ${sc.label}: ${count.toLocaleString()}${
-                  ratio != null ? ` (${Math.round(ratio)}%)` : ""
-                }${isBottleneck ? " · 병목" : ""}${
-                  readyTone === "ready-inspection"
-                    ? " · Ready for Inspection"
-                    : readyTone === "ready-handover"
-                      ? " · Ready for Handover"
-                      : ""
-                }${
-                  eachDate && isStageSlot
-                    ? ` · ${stageDone ? "실적일" : "계획일"} ${dateValue ?? "없음"}`
-                    : ""
-                }`}
-                className={cn(
-                  "block h-full w-full px-1 leading-none hover:bg-primary/10",
-                  eachDate ? "text-center text-[10px]" : "text-right text-xs",
-                  !eachDate && sc.slot === "issued" && !isTotal && "font-medium",
-                  eachDate
-                    ? stageDone
-                      ? "text-muted-foreground"
-                      : dateValue
-                        ? "text-foreground"
-                        : "text-muted-foreground/50"
-                    : showPct
-                      ? isRemain
-                        ? remainPctTone(ratio)
-                        : pctTone(ratio)
-                      : zeroDim,
-                  !eachDate && isBottleneck && !isTotal && "font-semibold",
-                  !eachDate && readyTone && !isTotal && "font-semibold text-foreground",
-                  isTotal && "font-bold",
-                )}
-              >
-                {eachDate ? dateText : text}
-              </button>
-            </td>
-          );
-        }),
-      )}
+      {STATUS_COLS.map((sc, sIdx) => (
+        <Fragment key={`slot-${sc.slot}`}>
+          {TEAM_COL_ORDER.map((team, tIdx) =>
+            renderCell(sc, sIdx, team, tIdx, "num", sIdx === 0 && tIdx === 0, tIdx === 0),
+          )}
+          {dual &&
+            sc.slot !== "issued" &&
+            TEAM_COL_ORDER.map((team, tIdx) =>
+              renderCell(sc, sIdx, team, tIdx, "date", false, tIdx === 0),
+            )}
+        </Fragment>
+      ))}
     </>
   );
 }
 
-/** Three-row header: Room Group → Status → Team. */
+
+/** Header: Room Group → Status → (잔여/Date) → Team. */
 function MatrixHeader({
   block,
   buildingParam,
   onNavigate,
   showHoDate,
   srcRG,
+  dual,
 }: {
   block: MatrixBlock;
   buildingParam: Record<string, string>;
   onNavigate: (p: Record<string, string>) => void;
   showHoDate: boolean;
   srcRG: (col: string) => string;
+  dual: boolean;
 }) {
   const groups: Array<{ key: string; label: string; isTotal?: boolean; isNa?: boolean }> = [
     ...block.columnKeys.map((rg) => ({ key: rg as string, label: rg as string, isNa: rg === "N/A" })),
@@ -271,14 +301,14 @@ function MatrixHeader({
       {/* Tier 1: Room Group */}
       <tr>
         <th
-          rowSpan={3}
+          rowSpan={dual ? 4 : 3}
           className="sticky left-0 top-0 z-40 min-w-[100px] border-b-2 border-r px-2 py-1.5 text-left text-[11px] font-semibold"
           style={{ background: "color-mix(in oklab, var(--muted) 70%, var(--card))" }}
         >
           {block.rowAxis.primary}
         </th>
         <th
-          rowSpan={3}
+          rowSpan={dual ? 4 : 3}
           className="sticky left-[100px] top-0 z-40 min-w-[80px] border-b-2 border-r px-2 py-1.5 text-left text-[11px] font-semibold"
           style={{ background: "color-mix(in oklab, var(--muted) 70%, var(--card))" }}
         >
@@ -287,7 +317,7 @@ function MatrixHeader({
         {groups.map((g, idx) => (
           <th
             key={g.key}
-            colSpan={COLS_PER_GROUP + (showHoDate ? 1 : 0)}
+            colSpan={perGroupCols(dual) + (showHoDate ? 1 : 0)}
             className="sticky top-0 z-30 border-b border-l-2 border-l-border px-2 py-1.5 text-center text-[11px] font-semibold uppercase tracking-wide"
             style={{ background: groupBg(g, idx) }}
           >
@@ -320,7 +350,11 @@ function MatrixHeader({
           {STATUS_COLS.map((sc, sIdx) => (
             <th
               key={`${g.key}-${sc.slot}`}
-              colSpan={TEAM_COL_ORDER.length}
+              colSpan={
+                dual && sc.slot !== "issued"
+                  ? TEAM_COL_ORDER.length * 2
+                  : TEAM_COL_ORDER.length
+              }
               className={cn(
                 "sticky top-[30px] z-30 h-6 border-b px-1 text-center text-[10px] font-semibold uppercase tracking-wide text-muted-foreground",
                 sIdx === 0 && "border-l-2 border-l-border",
@@ -334,7 +368,7 @@ function MatrixHeader({
           {showHoDate && (
             <th
               key={`${g.key}-hodate`}
-              rowSpan={2}
+              rowSpan={dual ? 3 : 2}
               className="sticky top-[30px] z-30 min-w-[52px] border-b border-l border-l-border/70 px-1 text-center text-[10px] font-semibold uppercase tracking-wide text-muted-foreground"
               style={{ background: groupBg(g, idx) }}
             >
@@ -344,25 +378,54 @@ function MatrixHeader({
           </Fragment>
         ))}
       </tr>
+      {/* Tier 2b: 잔여 / Date (잔여+Date 모드 전용) */}
+      {dual && (
+        <tr>
+          {groups.map((g, idx) =>
+            STATUS_COLS.map((sc, sIdx) =>
+              (sc.slot === "issued" ? (["num"] as const) : (["num", "date"] as const)).map(
+                (kind) => (
+                  <th
+                    key={`${g.key}-${sc.slot}-${kind}`}
+                    colSpan={TEAM_COL_ORDER.length}
+                    className={cn(
+                      "sticky top-[54px] z-30 h-6 border-b px-1 text-center text-[10px] font-medium uppercase tracking-wide text-muted-foreground",
+                      sIdx === 0 && kind === "num" && "border-l-2 border-l-border",
+                      !(sIdx === 0 && kind === "num") && "border-l border-l-border/70",
+                    )}
+                    style={{ background: groupBg(g, idx) }}
+                  >
+                    {sc.slot === "issued" ? "개수" : kind === "num" ? "잔여" : "Date"}
+                  </th>
+                ),
+              ),
+            ),
+          )}
+        </tr>
+      )}
       {/* Tier 3: Team */}
       <tr>
         {groups.map((g, idx) =>
           STATUS_COLS.map((sc, sIdx) =>
-            TEAM_COL_ORDER.map((team, tIdx) => (
-              <th
-                key={`${g.key}-${sc.slot}-${team}`}
-                className={cn(
-                  "sticky top-[54px] z-30 h-6 min-w-[40px] border-b px-1 text-right text-[10px] font-medium uppercase tracking-wide text-muted-foreground",
-                  sIdx === 0 && tIdx === 0 && "border-l-2 border-l-border",
-                  !(sIdx === 0 && tIdx === 0) && tIdx === 0 && "border-l border-l-border/70",
-                  tIdx !== 0 && "border-r border-r-border/30",
-                )}
-                style={{ background: groupBg(g, idx) }}
-                title={`${sc.label} · ${team}`}
-              >
-                {team === "ELEC" ? "Elec" : team === "MECH" ? "Mech" : "Arch"}
-              </th>
-            )),
+            (dual && sc.slot !== "issued" ? (["num", "date"] as const) : (["num"] as const)).map(
+              (kind) =>
+                TEAM_COL_ORDER.map((team, tIdx) => (
+                  <th
+                    key={`${g.key}-${sc.slot}-${kind}-${team}`}
+                    className={cn(
+                      "sticky z-30 h-6 min-w-[40px] border-b px-1 text-[10px] font-medium uppercase tracking-wide text-muted-foreground",
+                      kind === "date" ? "text-center" : "text-right",
+                      sIdx === 0 && kind === "num" && tIdx === 0 && "border-l-2 border-l-border",
+                      !(sIdx === 0 && kind === "num") && tIdx === 0 && "border-l border-l-border/70",
+                      tIdx !== 0 && "border-r border-r-border/30",
+                    )}
+                    style={{ background: groupBg(g, idx), top: TEAM_ROW_TOP(dual) }}
+                    title={`${sc.label} · ${team}${kind === "date" ? " · Date" : ""}`}
+                  >
+                    {team === "ELEC" ? "Elec" : team === "MECH" ? "Mech" : "Arch"}
+                  </th>
+                )),
+            ),
           ),
         )}
       </tr>
@@ -380,6 +443,7 @@ export function DeSnagMatrixBlock({
   showHoDate = false,
   hoDates = EMPTY_HO_DATE_MAP,
   eachDate = false,
+  remainDate = false,
   stageDates = EMPTY_STAGE_DATE_MAP,
 }: {
   block: MatrixBlock;
@@ -392,8 +456,11 @@ export function DeSnagMatrixBlock({
   showHoDate?: boolean;
   hoDates?: HoDateMap;
   eachDate?: boolean;
+  /** 잔여 개수 + Date 병기 모드 */
+  remainDate?: boolean;
   stageDates?: StageDateMap;
 }) {
+  const dual = remainDate;
   // 라벨 → 원본 값. 목록을 컴포넌트에 적지 않는다.
   const srcB = (label: string) => (buildingSourceMap[label] ?? [label]).join(",");
   const srcL = (label: string) => (levelSourceMap[label] ?? [label]).join(",");
@@ -471,14 +538,18 @@ export function DeSnagMatrixBlock({
             onNavigate={onNavigate}
             showHoDate={showHoDate}
             srcRG={srcRG}
+            dual={dual}
           />
           <tbody>
             {/* Column Total 행 — 헤더 바로 아래 고정 */}
             <tr className="font-bold">
               <td
-                className="sticky left-0 top-[78px] z-30 border-r border-b-2 border-b-border px-2 py-1 text-[11px]"
+                className="sticky left-0 z-30 border-r border-b-2 border-b-border px-2 py-1 text-[11px]"
                 colSpan={2}
-                style={{ background: "color-mix(in oklab, var(--color-yellow-400) 14%, var(--card))" }}
+                style={{
+                  top: TOTAL_ROW_TOP(dual),
+                  background: "color-mix(in oklab, var(--color-yellow-400) 14%, var(--card))",
+                }}
               >
                 <button
                   type="button"
@@ -491,14 +562,15 @@ export function DeSnagMatrixBlock({
               {block.columnKeys.map((rg, idx) => (
                 <Fragment key={rg}>
                   <TeamCells
+                    dual={dual}
                     stats={block.colTotals[rg]}
                     mode={mode}
                     onCell={(slot, team) => goCell(null, null, rg, slot, team)}
                     groupIndex={idx}
                     isTotal
-                    stickyTop={78}
+                    stickyTop={TOTAL_ROW_TOP(dual)}
                     stageDate={
-                      eachDate
+                      eachDate || remainDate
                         ? (stage, team, which) => stageDates.col(block.kind, rg, stage, team, which)
                         : undefined
                     }
@@ -508,20 +580,21 @@ export function DeSnagMatrixBlock({
                       value={hoDates.col(block.kind, rg)}
                       groupIndex={idx}
                       isTotal
-                      stickyTop={78}
+                      stickyTop={TOTAL_ROW_TOP(dual)}
                     />
                   )}
                 </Fragment>
               ))}
               <TeamCells
+                dual={dual}
                 stats={block.blockTotal}
                 mode={mode}
                 onCell={(slot, team) => goCell(null, null, "__ROW_TOTAL__", slot, team)}
                 groupIndex={block.columnKeys.length}
                 isTotal
-                stickyTop={78}
+                stickyTop={TOTAL_ROW_TOP(dual)}
                 stageDate={
-                  eachDate
+                  eachDate || remainDate
                     ? (stage, team, which) => stageDates.block(block.kind, stage, team, which)
                     : undefined
                 }
@@ -531,7 +604,7 @@ export function DeSnagMatrixBlock({
                   value={hoDates.block(block.kind)}
                   groupIndex={block.columnKeys.length}
                   isTotal
-                  stickyTop={78}
+                  stickyTop={TOTAL_ROW_TOP(dual)}
                 />
               )}
             </tr>
@@ -549,6 +622,7 @@ export function DeSnagMatrixBlock({
                 showHoDate={showHoDate}
                 hoDates={hoDates}
                 eachDate={eachDate}
+                remainDate={remainDate}
                 stageDates={stageDates}
               />
             ))}
@@ -571,6 +645,7 @@ function FragmentRows({
   showHoDate,
   hoDates,
   eachDate,
+  remainDate,
   stageDates,
 }: {
   group: { building: string; rows: MatrixBlock["rows"]; subtotal: Stats };
@@ -590,8 +665,10 @@ function FragmentRows({
   showHoDate: boolean;
   hoDates: HoDateMap;
   eachDate: boolean;
+  remainDate: boolean;
   stageDates: StageDateMap;
 }) {
+  const dual = remainDate;
   const showBuildingSubtotal = block.kind === "podium" && group.rows.length > 1;
   return (
     <>
@@ -638,13 +715,14 @@ function FragmentRows({
           {block.columnKeys.map((rg, gIdx) => (
             <Fragment key={rg}>
               <TeamCells
+                dual={dual}
                 stats={r.cells[rg]}
                 mode={mode}
                 onCell={(slot, team) => goCell(r.building, r.levelDisp, rg, slot, team)}
                 dim={r.cells[rg].issued === 0}
                 groupIndex={gIdx}
                 stageDate={
-                  eachDate
+                  eachDate || remainDate
                     ? (stage, team, which) =>
                         stageDates.cell(block.kind, r.building, r.levelDisp, rg, stage, team, which)
                     : undefined
@@ -659,13 +737,14 @@ function FragmentRows({
             </Fragment>
           ))}
           <TeamCells
+            dual={dual}
             stats={r.rowTotal}
             mode={mode}
             onCell={(slot, team) => goCell(r.building, r.levelDisp, "__ROW_TOTAL__", slot, team)}
             groupIndex={block.columnKeys.length}
             isTotal
             stageDate={
-              eachDate
+              eachDate || remainDate
                 ? (stage, team, which) =>
                     stageDates.row(block.kind, r.building, r.levelDisp, stage, team, which)
                 : undefined
@@ -701,12 +780,13 @@ function FragmentRows({
             return (
               <Fragment key={rg}>
                 <TeamCells
+                  dual={dual}
                   stats={sub}
                   mode={mode}
                   onCell={(slot, team) => goCell(group.building, null, rg, slot, team)}
                   groupIndex={gIdx}
                   stageDate={
-                    eachDate
+                    eachDate || remainDate
                       ? (stage, team, which) =>
                           stageDates.buildingCol(block.kind, group.building, rg, stage, team, which)
                       : undefined
@@ -717,13 +797,14 @@ function FragmentRows({
             );
           })}
           <TeamCells
+            dual={dual}
             stats={group.subtotal}
             mode={mode}
             onCell={(slot, team) => goCell(group.building, null, "__BUILDING_SUBTOTAL__", slot, team)}
             groupIndex={block.columnKeys.length}
             isTotal
             stageDate={
-              eachDate
+              eachDate || remainDate
                 ? (stage, team, which) =>
                     stageDates.building(block.kind, group.building, stage, team, which)
                 : undefined
