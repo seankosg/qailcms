@@ -110,10 +110,13 @@ export function exportSnagMatrixToXlsx(args: {
   hoDates?: HoDateMap;
   /** 잔여 개수 + Date 병기 모드 */
   remainDate?: boolean;
+  /** Each Date 모드 — 스테이지 셀 숫자를 날짜로 대체 */
+  eachDate?: boolean;
   stageDates?: StageDateMap;
 }) {
   const { matrix, asOf } = args;
   const dual = !!args.remainDate;
+  const eachDate = !dual && !!args.eachDate;
   const mode = dual ? "remain" : args.mode;
   const showHoDate = !dual && !!args.showHoDate;
   const hoDates = args.hoDates ?? EMPTY_HO_DATE_MAP;
@@ -137,7 +140,9 @@ export function exportSnagMatrixToXlsx(args: {
       `표기: ${
         dual
           ? "잔여 개수 + 스테이지 날짜(계획일 / 완료 시 실적일)"
-          : mode === "pct"
+          : eachDate
+            ? "스테이지 날짜 (계획일 / 완료 시 실적일)"
+            : mode === "pct"
           ? "% (Rect/Closed = 같은 팀 Issued 대비)"
           : mode === "remain"
             ? "잔여 개수 (Issued − 실적)"
@@ -243,6 +248,24 @@ export function exportSnagMatrixToXlsx(args: {
           const style = numCell({ bg, bold: emphasize || isTotalGroup || bn || sc.slot === "issued", color, pct: showPct });
           const v = showPct ? (ratio == null ? "–" : ratio) : count;
           const cBase = base + slotOffset(si, dual);
+          if (eachDate && sc.slot !== "issued") {
+            const stageDone = t.issued > 0 && t.issued - doneVal <= 0;
+            const dv = stageDate
+              ? stageDate(sc.slot as StageMetric, team, stageDone ? "actual" : "planned")
+              : null;
+            put(ws, r, cBase + ti, formatHoDate(dv), {
+              font: {
+                name: F,
+                sz: 10,
+                bold: emphasize || isTotalGroup,
+                color: { rgb: dv ? (stageDone ? "FF6B7280" : "FF111827") : "FF9CA3AF" },
+              },
+              fill: { fgColor: { rgb: isTotalGroup || emphasize ? TOTAL_BG : GROUP_BG[gi % 2] } },
+              alignment: { vertical: "center", horizontal: "center" },
+              border: BOX,
+            });
+            return;
+          }
           put(ws, r, cBase + ti, v, style);
           if (dual && sc.slot !== "issued") {
             const stageDone = t.issued > 0 && t.issued - doneVal <= 0;
@@ -362,9 +385,12 @@ export function exportSnagMatrixToXlsx(args: {
     ws["!cols"] = [
       { wch: 16 },
       { wch: 14 },
-      ...Array.from({ length: totalCols - 2 }, (_, i) =>
-        showHoDate && i % GROUP_SPAN === perGroup ? { wch: 9 } : { wch: 7 },
-      ),
+      ...Array.from({ length: totalCols - 2 }, (_, i) => {
+        if (showHoDate && i % GROUP_SPAN === perGroup) return { wch: 9 };
+        if (eachDate && Math.floor((i % GROUP_SPAN) / TEAM_COL_ORDER.length) > 0)
+          return { wch: 9 };
+        return { wch: 7 };
+      }),
     ];
     ws["!rows"] = dual
       ? [{ hpt: 22 }, { hpt: 18 }, { hpt: 6 }, { hpt: 20 }, { hpt: 16 }, { hpt: 16 }, { hpt: 16 }]
@@ -377,7 +403,9 @@ export function exportSnagMatrixToXlsx(args: {
 
   const modeTag = dual
     ? "REMAIN-DATE"
-    : mode === "pct" ? "PCT" : mode === "remain" ? "REMAIN" : mode === "remainPct" ? "REMAIN-PCT" : "COUNT";
+    : eachDate
+      ? "EACH-DATE"
+      : mode === "pct" ? "PCT" : mode === "remain" ? "REMAIN" : mode === "remainPct" ? "REMAIN-PCT" : "COUNT";
   const fileName = `CMS_SM_Dashboard_Matrix_PLOT-${matrix.plot}_${modeTag}_${asOf}.xlsx`;
   XLSX.writeFile(wb, fileName);
 }
