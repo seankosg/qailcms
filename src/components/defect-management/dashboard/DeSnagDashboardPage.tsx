@@ -451,6 +451,7 @@ export function DeSnagDashboardPage() {
                 showHoDate,
                 hoDates,
                 remainDate,
+                eachDate,
                 stageDates,
               });
               toast.success("매트릭스를 엑셀로 내보냈습니다.");
