@@ -229,7 +229,7 @@ function TeamCells({
             wantDate && isStageSlot
               ? ` · ${stageDone ? "실적일" : "계획일"} ${dateValue ?? "없음"}`
               : ""
-          }`}
+          }${overdue ? " · 지연(계획일 경과)" : ""}`}
           className={cn(
             "block h-full w-full px-1 leading-none hover:bg-primary/10",
             kind === "date" || dateOnly ? "text-center text-[10px]" : "text-right text-xs",
