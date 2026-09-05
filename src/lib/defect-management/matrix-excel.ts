@@ -256,14 +256,15 @@ export function exportSnagMatrixToXlsx(args: {
             const dv = stageDate
               ? stageDate(sc.slot as StageMetric, team, stageDone ? "actual" : "planned")
               : null;
+            const od = !stageDone && dv != null && dv < today;
             put(ws, r, cBase + ti, formatHoDate(dv), {
               font: {
                 name: F,
                 sz: 10,
-                bold: emphasize || isTotalGroup,
-                color: { rgb: dv ? (stageDone ? "FF6B7280" : "FF111827") : "FF9CA3AF" },
+                bold: emphasize || isTotalGroup || od,
+                color: { rgb: od ? OVERDUE_FG : dv ? (stageDone ? "FF6B7280" : "FF111827") : "FF9CA3AF" },
               },
-              fill: { fgColor: { rgb: isTotalGroup || emphasize ? TOTAL_BG : GROUP_BG[gi % 2] } },
+              fill: { fgColor: { rgb: od ? OVERDUE_BG : isTotalGroup || emphasize ? TOTAL_BG : GROUP_BG[gi % 2] } },
               alignment: { vertical: "center", horizontal: "center" },
               border: BOX,
             });
@@ -275,14 +276,15 @@ export function exportSnagMatrixToXlsx(args: {
             const dv = stageDate
               ? stageDate(sc.slot as StageMetric, team, stageDone ? "actual" : "planned")
               : null;
+            const od = !stageDone && dv != null && dv < today;
             put(ws, r, cBase + TEAM_COL_ORDER.length + ti, formatHoDate(dv), {
               font: {
                 name: F,
                 sz: 10,
-                bold: emphasize || isTotalGroup,
-                color: { rgb: dv ? (stageDone ? "FF6B7280" : "FF111827") : "FF9CA3AF" },
+                bold: emphasize || isTotalGroup || od,
+                color: { rgb: od ? OVERDUE_FG : dv ? (stageDone ? "FF6B7280" : "FF111827") : "FF9CA3AF" },
               },
-              fill: { fgColor: { rgb: isTotalGroup || emphasize ? TOTAL_BG : GROUP_BG[gi % 2] } },
+              fill: { fgColor: { rgb: od ? OVERDUE_BG : isTotalGroup || emphasize ? TOTAL_BG : GROUP_BG[gi % 2] } },
               alignment: { vertical: "center", horizontal: "center" },
               border: BOX,
             });
