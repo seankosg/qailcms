@@ -1,6 +1,6 @@
 // SM 대시보드 매트릭스 → 스타일 적용 Excel 내보내기 (화면 구조 1:1)
 import XLSX from "xlsx-js-style";
-import { dohaDateTime } from "@/lib/time/doha";
+import { dohaDateTime, todayInDoha } from "@/lib/time/doha";
 import { formatHoDate, EMPTY_HO_DATE_MAP, type HoDateMap } from "./ho-dates";
 import { EMPTY_STAGE_DATE_MAP, type StageDateMap } from "./stage-dates";
 import {
@@ -75,6 +75,8 @@ const HDR_G1 = "FF1E3A5F";
 const HDR_G2 = "FF334155";
 const HDR_G3 = "FF475569";
 const HDR_TOTAL = "FF0F766E";
+const OVERDUE_BG = "FFFECACA";
+const OVERDUE_FG = "FFB91C1C";
 
 function put(ws: XLSX.WorkSheet, r: number, c: number, v: unknown, s: Record<string, unknown>) {
   const addr = XLSX.utils.encode_cell({ r, c });
@@ -115,6 +117,7 @@ export function exportSnagMatrixToXlsx(args: {
   stageDates?: StageDateMap;
 }) {
   const { matrix, asOf } = args;
+  const today = todayInDoha();
   const dual = !!args.remainDate;
   const eachDate = !dual && !!args.eachDate;
   const mode = dual ? "remain" : args.mode;
@@ -253,14 +256,15 @@ export function exportSnagMatrixToXlsx(args: {
             const dv = stageDate
               ? stageDate(sc.slot as StageMetric, team, stageDone ? "actual" : "planned")
               : null;
+            const od = !stageDone && dv != null && dv < today;
             put(ws, r, cBase + ti, formatHoDate(dv), {
               font: {
                 name: F,
                 sz: 10,
-                bold: emphasize || isTotalGroup,
-                color: { rgb: dv ? (stageDone ? "FF6B7280" : "FF111827") : "FF9CA3AF" },
+                bold: emphasize || isTotalGroup || od,
+                color: { rgb: od ? OVERDUE_FG : dv ? (stageDone ? "FF6B7280" : "FF111827") : "FF9CA3AF" },
               },
-              fill: { fgColor: { rgb: isTotalGroup || emphasize ? TOTAL_BG : GROUP_BG[gi % 2] } },
+              fill: { fgColor: { rgb: od ? OVERDUE_BG : isTotalGroup || emphasize ? TOTAL_BG : GROUP_BG[gi % 2] } },
               alignment: { vertical: "center", horizontal: "center" },
               border: BOX,
             });
@@ -272,14 +276,15 @@ export function exportSnagMatrixToXlsx(args: {
             const dv = stageDate
               ? stageDate(sc.slot as StageMetric, team, stageDone ? "actual" : "planned")
               : null;
+            const od = !stageDone && dv != null && dv < today;
             put(ws, r, cBase + TEAM_COL_ORDER.length + ti, formatHoDate(dv), {
               font: {
                 name: F,
                 sz: 10,
-                bold: emphasize || isTotalGroup,
-                color: { rgb: dv ? (stageDone ? "FF6B7280" : "FF111827") : "FF9CA3AF" },
+                bold: emphasize || isTotalGroup || od,
+                color: { rgb: od ? OVERDUE_FG : dv ? (stageDone ? "FF6B7280" : "FF111827") : "FF9CA3AF" },
               },
-              fill: { fgColor: { rgb: isTotalGroup || emphasize ? TOTAL_BG : GROUP_BG[gi % 2] } },
+              fill: { fgColor: { rgb: od ? OVERDUE_BG : isTotalGroup || emphasize ? TOTAL_BG : GROUP_BG[gi % 2] } },
               alignment: { vertical: "center", horizontal: "center" },
               border: BOX,
             });

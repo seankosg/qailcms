@@ -1,5 +1,6 @@
 import { cn } from "@/lib/utils";
 import { Fragment } from "react";
+import { todayInDoha } from "@/lib/time/doha";
 import { formatHoDate, EMPTY_HO_DATE_MAP, type HoDateMap } from "@/lib/defect-management/ho-dates";
 import {
   EMPTY_STAGE_DATE_MAP,
@@ -124,6 +125,7 @@ function TeamCells({
 
   const bottlenecks: Partial<Record<StatusSlot, TeamKey | null>> = {};
   for (const m of STAGE_METRICS) bottlenecks[m.slot] = bottleneckTeam(stats.byTeam, m.slot);
+  const today = todayInDoha();
 
   // 잔여 모드 전용 Room Group 단위 상태 하이라이트
   const isRemainMode = dual || mode === "remain" || mode === "remainPct";
@@ -174,15 +176,20 @@ function TeamCells({
         ? stageDate(sc.slot as StageMetric, team, stageDone ? "actual" : "planned")
         : null;
     const dateText = wantDate ? (isStageSlot ? formatHoDate(dateValue) : "–") : null;
+    // Overdue: 미완료(잔여 > 0)인데 계획일이 도하 기준 오늘보다 과거
+    const overdue =
+      wantDate && isStageSlot && !stageDone && dateValue != null && dateValue < today;
 
     const readyBg =
       wantDate && stageDone
         ? "color-mix(in oklab, var(--muted) 90%, var(--card))"
-        : kind === "num" && readyTone === "ready-inspection"
-          ? "color-mix(in oklab, var(--color-sky-400) 30%, var(--card))"
-          : kind === "num" && readyTone === "ready-handover"
-            ? "color-mix(in oklab, var(--color-emerald-400) 30%, var(--card))"
-            : null;
+        : overdue
+          ? "color-mix(in oklab, var(--destructive) 28%, var(--card))"
+          : kind === "num" && readyTone === "ready-inspection"
+            ? "color-mix(in oklab, var(--color-sky-400) 30%, var(--card))"
+            : kind === "num" && readyTone === "ready-handover"
+              ? "color-mix(in oklab, var(--color-emerald-400) 30%, var(--card))"
+              : null;
     const showBottleneckBg = isBottleneck && !readyBg && kind === "num" && !dateOnly;
 
     return (
@@ -222,7 +229,7 @@ function TeamCells({
             wantDate && isStageSlot
               ? ` · ${stageDone ? "실적일" : "계획일"} ${dateValue ?? "없음"}`
               : ""
-          }`}
+          }${overdue ? " · 지연(계획일 경과)" : ""}`}
           className={cn(
             "block h-full w-full px-1 leading-none hover:bg-primary/10",
             kind === "date" || dateOnly ? "text-center text-[10px]" : "text-right text-xs",
@@ -230,9 +237,11 @@ function TeamCells({
             kind === "date" || dateOnly
               ? stageDone
                 ? "text-muted-foreground"
-                : dateValue
-                  ? "text-foreground"
-                  : "text-muted-foreground/50"
+                : overdue
+                  ? "text-destructive font-bold"
+                  : dateValue
+                    ? "text-foreground"
+                    : "text-muted-foreground/50"
               : showPct
                 ? isRemainMode
                   ? remainPctTone(ratio)
