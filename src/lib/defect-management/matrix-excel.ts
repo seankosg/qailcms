@@ -195,7 +195,7 @@ export function exportSnagMatrixToXlsx(args: {
         kinds.forEach((kind, ki) => {
           const kBase = sBase + ki * TEAM_COL_ORDER.length;
           if (dual) {
-            const label = sc.slot === "issued" ? "개수" : kind === "num" ? "잔여" : "Date";
+            const label = sc.slot === "issued" ? "개수" : kind === "num" ? "Remain" : "Date";
             put(ws, H2B, kBase, label, hdr(bg2));
             for (let k = 1; k < TEAM_COL_ORDER.length; k++) put(ws, H2B, kBase + k, "", hdr(bg2));
             merges.push({ s: { r: H2B, c: kBase }, e: { r: H2B, c: kBase + TEAM_COL_ORDER.length - 1 } });
