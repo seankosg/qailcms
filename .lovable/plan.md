@@ -73,9 +73,11 @@ De-Snagging Matrix에 **잔여 개수와 Each Date를 한 화면에 동시 표�
 | `src/routes/_authenticated/closure/snag-management/dashboard.tsx` | `remainDate` 파라미터 추가 |
 | `src/components/defect-management/dashboard/DeSnagDashboardPage.tsx` | 스위치 추가, 상호 배타, stageDates 조회 확장, 모드 탭 비활성 |
 | `src/components/defect-management/dashboard/DeSnagMatrixBlock.tsx` | 33열 레이아웃, 헤더 4단화, TeamCells 날짜 서브열, sticky 오프셋 |
+| `src/lib/defect-management/matrix-excel.ts` | remainDate 모드 열 구조·4단 헤더·파일명 태그 |
 
 ## 검증
 
 - 타입체크 통과
 - 프리뷰에서 토글 ON/OFF, 상호 배타, Plot/팀/Room Group 필터 조합, 드릴다운 숫자 정합(잔여 셀 = Raw Data 건수) 확인
 - 스크린샷으로 33열 레이아웃·헤더 정렬·sticky 동작 확인
+- 토글 ON 상태에서 엑셀 다운로드 → 화면과 열 구성·값이 일치하는지 대조
