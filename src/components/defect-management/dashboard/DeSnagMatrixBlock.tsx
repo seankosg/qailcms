@@ -443,6 +443,7 @@ export function DeSnagMatrixBlock({
   showHoDate = false,
   hoDates = EMPTY_HO_DATE_MAP,
   eachDate = false,
+  remainDate = false,
   stageDates = EMPTY_STAGE_DATE_MAP,
 }: {
   block: MatrixBlock;
@@ -455,8 +456,11 @@ export function DeSnagMatrixBlock({
   showHoDate?: boolean;
   hoDates?: HoDateMap;
   eachDate?: boolean;
+  /** 잔여 개수 + Date 병기 모드 */
+  remainDate?: boolean;
   stageDates?: StageDateMap;
 }) {
+  const dual = remainDate;
   // 라벨 → 원본 값. 목록을 컴포넌트에 적지 않는다.
   const srcB = (label: string) => (buildingSourceMap[label] ?? [label]).join(",");
   const srcL = (label: string) => (levelSourceMap[label] ?? [label]).join(",");
@@ -534,14 +538,18 @@ export function DeSnagMatrixBlock({
             onNavigate={onNavigate}
             showHoDate={showHoDate}
             srcRG={srcRG}
+            dual={dual}
           />
           <tbody>
             {/* Column Total 행 — 헤더 바로 아래 고정 */}
             <tr className="font-bold">
               <td
-                className="sticky left-0 top-[78px] z-30 border-r border-b-2 border-b-border px-2 py-1 text-[11px]"
+                className="sticky left-0 z-30 border-r border-b-2 border-b-border px-2 py-1 text-[11px]"
                 colSpan={2}
-                style={{ background: "color-mix(in oklab, var(--color-yellow-400) 14%, var(--card))" }}
+                style={{
+                  top: TOTAL_ROW_TOP(dual),
+                  background: "color-mix(in oklab, var(--color-yellow-400) 14%, var(--card))",
+                }}
               >
                 <button
                   type="button"
@@ -614,6 +622,7 @@ export function DeSnagMatrixBlock({
                 showHoDate={showHoDate}
                 hoDates={hoDates}
                 eachDate={eachDate}
+                remainDate={remainDate}
                 stageDates={stageDates}
               />
             ))}
@@ -636,6 +645,7 @@ function FragmentRows({
   showHoDate,
   hoDates,
   eachDate,
+  remainDate,
   stageDates,
 }: {
   group: { building: string; rows: MatrixBlock["rows"]; subtotal: Stats };
@@ -655,8 +665,10 @@ function FragmentRows({
   showHoDate: boolean;
   hoDates: HoDateMap;
   eachDate: boolean;
+  remainDate: boolean;
   stageDates: StageDateMap;
 }) {
+  const dual = remainDate;
   const showBuildingSubtotal = block.kind === "podium" && group.rows.length > 1;
   return (
     <>
