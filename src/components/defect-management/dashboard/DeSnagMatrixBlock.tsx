@@ -34,6 +34,14 @@ const STATUS_COLS: Array<{ slot: StatusSlot; label: string }> = [
 ];
 
 const COLS_PER_GROUP = STATUS_COLS.length * TEAM_COL_ORDER.length; // 6 slots × 3 teams
+/** 잔여+Date 모드: Issued 3열 + 스테이지 5개 × (잔여 3 + Date 3) */
+const COLS_PER_GROUP_DUAL =
+  TEAM_COL_ORDER.length + STAGE_METRICS.length * TEAM_COL_ORDER.length * 2;
+const perGroupCols = (dual: boolean) => (dual ? COLS_PER_GROUP_DUAL : COLS_PER_GROUP);
+/** sticky 헤더 오프셋 — 4단(잔여+Date)일 때 한 단(24px) 더 내려간다 */
+const TEAM_ROW_TOP = (dual: boolean) => (dual ? 78 : 54);
+const TOTAL_ROW_TOP = (dual: boolean) => (dual ? 102 : 78);
+
 
 /** HO Planned Date (dd/mmm) 셀 */
 function HoCell({
