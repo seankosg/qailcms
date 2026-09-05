@@ -1,6 +1,6 @@
 // SM 대시보드 매트릭스 → 스타일 적용 Excel 내보내기 (화면 구조 1:1)
 import XLSX from "xlsx-js-style";
-import { dohaDateTime } from "@/lib/time/doha";
+import { dohaDateTime, todayInDoha } from "@/lib/time/doha";
 import { formatHoDate, EMPTY_HO_DATE_MAP, type HoDateMap } from "./ho-dates";
 import { EMPTY_STAGE_DATE_MAP, type StageDateMap } from "./stage-dates";
 import {
@@ -75,6 +75,8 @@ const HDR_G1 = "FF1E3A5F";
 const HDR_G2 = "FF334155";
 const HDR_G3 = "FF475569";
 const HDR_TOTAL = "FF0F766E";
+const OVERDUE_BG = "FFFECACA";
+const OVERDUE_FG = "FFB91C1C";
 
 function put(ws: XLSX.WorkSheet, r: number, c: number, v: unknown, s: Record<string, unknown>) {
   const addr = XLSX.utils.encode_cell({ r, c });
