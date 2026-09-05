@@ -156,42 +156,70 @@ export function exportSnagMatrixToXlsx(args: {
       put(ws, 1, c, "", sMeta);
     }
 
-    const H1 = 3, H2 = 4, H3 = 5, DATA = 6;
+    const H1 = 3, H2 = 4, H2B = dual ? 5 : -1, H3 = dual ? 6 : 5, DATA = dual ? 7 : 6;
 
     put(ws, H1, 0, block.rowAxis.primary, hdr(HDR_G1, 11));
     put(ws, H1, 1, block.rowAxis.secondary, hdr(HDR_G1, 11));
     merges.push({ s: { r: H1, c: 0 }, e: { r: H3, c: 0 } });
     merges.push({ s: { r: H1, c: 1 }, e: { r: H3, c: 1 } });
-    for (const r of [H2, H3]) {
-      put(ws, r, 0, "", hdr(HDR_G1, 11));
-      put(ws, r, 1, "", hdr(HDR_G1, 11));
+    for (let rr = H1 + 1; rr <= H3; rr++) {
+      put(ws, rr, 0, "", hdr(HDR_G1, 11));
+      put(ws, rr, 1, "", hdr(HDR_G1, 11));
     }
 
     groupCols.forEach((g, gi) => {
       const base = 2 + gi * GROUP_SPAN;
       const bg1 = g.total ? HDR_TOTAL : HDR_G1;
+      const bg2 = g.total ? HDR_TOTAL : HDR_G2;
+      const bg3 = g.total ? HDR_TOTAL : HDR_G3;
       put(ws, H1, base, g.label, hdr(bg1, 11));
       for (let k = 1; k < GROUP_SPAN; k++) put(ws, H1, base + k, "", hdr(bg1, 11));
       merges.push({ s: { r: H1, c: base }, e: { r: H1, c: base + GROUP_SPAN - 1 } });
       SLOTS.forEach((sc, si) => {
-        const sBase = base + si * TEAM_COL_ORDER.length;
-        put(ws, H2, sBase, sc.label, hdr(g.total ? HDR_TOTAL : HDR_G2));
-        for (let k = 1; k < TEAM_COL_ORDER.length; k++) put(ws, H2, sBase + k, "", hdr(g.total ? HDR_TOTAL : HDR_G2));
-        merges.push({ s: { r: H2, c: sBase }, e: { r: H2, c: sBase + TEAM_COL_ORDER.length - 1 } });
-        TEAM_COL_ORDER.forEach((team, ti) => {
-          put(ws, H3, sBase + ti, TEAM_LABEL[team], hdr(g.total ? HDR_TOTAL : HDR_G3));
+        const sBase = base + slotOffset(si, dual);
+        const span =
+          dual && sc.slot !== "issued" ? TEAM_COL_ORDER.length * 2 : TEAM_COL_ORDER.length;
+        put(ws, H2, sBase, sc.label, hdr(bg2));
+        for (let k = 1; k < span; k++) put(ws, H2, sBase + k, "", hdr(bg2));
+        merges.push({ s: { r: H2, c: sBase }, e: { r: H2, c: sBase + span - 1 } });
+        const kinds: Array<"num" | "date"> =
+          dual && sc.slot !== "issued" ? ["num", "date"] : ["num"];
+        kinds.forEach((kind, ki) => {
+          const kBase = sBase + ki * TEAM_COL_ORDER.length;
+          if (dual) {
+            const label = sc.slot === "issued" ? "개수" : kind === "num" ? "잔여" : "Date";
+            put(ws, H2B, kBase, label, hdr(bg2));
+            for (let k = 1; k < TEAM_COL_ORDER.length; k++) put(ws, H2B, kBase + k, "", hdr(bg2));
+            merges.push({ s: { r: H2B, c: kBase }, e: { r: H2B, c: kBase + TEAM_COL_ORDER.length - 1 } });
+          }
+          TEAM_COL_ORDER.forEach((team, ti) => {
+            put(ws, H3, kBase + ti, TEAM_LABEL[team], hdr(bg3));
+          });
         });
       });
       if (showHoDate) {
-        const hBase = base + PER_GROUP;
+        const hBase = base + perGroup;
         const hb = g.total ? HDR_TOTAL : HDR_G2;
         put(ws, H2, hBase, g.total ? "Level HO" : "HO Date", hdr(hb));
-        put(ws, H3, hBase, "", hdr(g.total ? HDR_TOTAL : HDR_G3));
+        put(ws, H3, hBase, "", hdr(bg3));
         merges.push({ s: { r: H2, c: hBase }, e: { r: H3, c: hBase } });
       }
     });
 
-    const writeStats = (r: number, stats: Stats, gi: number, isTotalGroup: boolean, emphasize: boolean) => {
+    type StageDateFn = (
+      stage: StageMetric,
+      team: TeamKey,
+      which: "planned" | "actual",
+    ) => string | null;
+
+    const writeStats = (
+      r: number,
+      stats: Stats,
+      gi: number,
+      isTotalGroup: boolean,
+      emphasize: boolean,
+      stageDate?: StageDateFn,
+    ) => {
       const base = 2 + gi * GROUP_SPAN;
       const bn_: Partial<Record<Slot, TeamKey | null>> = {};
       for (const m of STAGE_METRICS) bn_[m.slot] = bottleneckTeam(stats.byTeam, m.slot);
@@ -214,10 +242,29 @@ export function exportSnagMatrixToXlsx(args: {
           else if (!showPct && count === 0) color = "FF9CA3AF";
           const style = numCell({ bg, bold: emphasize || isTotalGroup || bn || sc.slot === "issued", color, pct: showPct });
           const v = showPct ? (ratio == null ? "–" : ratio) : count;
-          put(ws, r, base + si * TEAM_COL_ORDER.length + ti, v, style);
+          const cBase = base + slotOffset(si, dual);
+          put(ws, r, cBase + ti, v, style);
+          if (dual && sc.slot !== "issued") {
+            const stageDone = t.issued > 0 && t.issued - doneVal <= 0;
+            const dv = stageDate
+              ? stageDate(sc.slot as StageMetric, team, stageDone ? "actual" : "planned")
+              : null;
+            put(ws, r, cBase + TEAM_COL_ORDER.length + ti, formatHoDate(dv), {
+              font: {
+                name: F,
+                sz: 10,
+                bold: emphasize || isTotalGroup,
+                color: { rgb: dv ? (stageDone ? "FF6B7280" : "FF111827") : "FF9CA3AF" },
+              },
+              fill: { fgColor: { rgb: isTotalGroup || emphasize ? TOTAL_BG : GROUP_BG[gi % 2] } },
+              alignment: { vertical: "center", horizontal: "center" },
+              border: BOX,
+            });
+          }
         });
       });
     };
+
 
     const writeHo = (r: number, gi: number, isTotalGroup: boolean, emphasize: boolean, value: string | null) => {
       if (!showHoDate) return;
