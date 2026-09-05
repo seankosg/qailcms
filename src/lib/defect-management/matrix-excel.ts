@@ -117,6 +117,7 @@ export function exportSnagMatrixToXlsx(args: {
   stageDates?: StageDateMap;
 }) {
   const { matrix, asOf } = args;
+  const today = todayInDoha();
   const dual = !!args.remainDate;
   const eachDate = !dual && !!args.eachDate;
   const mode = dual ? "remain" : args.mode;
