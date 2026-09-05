@@ -268,7 +268,7 @@ export function exportSnagMatrixToXlsx(args: {
 
     const writeHo = (r: number, gi: number, isTotalGroup: boolean, emphasize: boolean, value: string | null) => {
       if (!showHoDate) return;
-      const c = 2 + gi * GROUP_SPAN + PER_GROUP;
+      const c = 2 + gi * GROUP_SPAN + perGroup;
       const bg = isTotalGroup || emphasize ? TOTAL_BG : GROUP_BG[gi % 2];
       put(ws, r, c, formatHoDate(value), {
         font: { name: F, sz: 10, bold: emphasize || isTotalGroup, color: { rgb: value ? "FF111827" : "FF9CA3AF" } },
@@ -284,10 +284,14 @@ export function exportSnagMatrixToXlsx(args: {
     put(ws, r, 1, "", { ...sAxis, fill: { fgColor: { rgb: TOTAL_BG } } });
     merges.push({ s: { r, c: 0 }, e: { r, c: 1 } });
     cols.forEach((rg, gi) => {
-      writeStats(r, block.colTotals[rg], gi, false, true);
+      writeStats(r, block.colTotals[rg], gi, false, true, (stage, team, which) =>
+        stageDates.col(block.kind, rg, stage, team, which),
+      );
       writeHo(r, gi, false, true, hoDates.col(block.kind, rg));
     });
-    writeStats(r, block.blockTotal, cols.length, true, true);
+    writeStats(r, block.blockTotal, cols.length, true, true, (stage, team, which) =>
+      stageDates.block(block.kind, stage, team, which),
+    );
     writeHo(r, cols.length, true, true, hoDates.block(block.kind));
     r++;
 
@@ -312,10 +316,14 @@ export function exportSnagMatrixToXlsx(args: {
         put(ws, r, 0, row.building, sAxis);
         put(ws, r, 1, row.levelDisp, sAxis);
         cols.forEach((rg, gi) => {
-          writeStats(r, row.cells[rg], gi, false, false);
+          writeStats(r, row.cells[rg], gi, false, false, (stage, team, which) =>
+            stageDates.cell(block.kind, row.building, row.levelDisp, rg, stage, team, which),
+          );
           writeHo(r, gi, false, false, hoDates.cell(block.kind, row.building, row.levelDisp, rg));
         });
-        writeStats(r, row.rowTotal, cols.length, true, false);
+        writeStats(r, row.rowTotal, cols.length, true, false, (stage, team, which) =>
+          stageDates.row(block.kind, row.building, row.levelDisp, stage, team, which),
+        );
         writeHo(r, cols.length, true, false, hoDates.row(block.kind, row.building, row.levelDisp));
         r++;
       });
@@ -325,7 +333,9 @@ export function exportSnagMatrixToXlsx(args: {
         cols.forEach((rg, gi) => {
           const sub = newStats();
           for (const row of grp.rows) mergeStats(sub, row.cells[rg]);
-          writeStats(r, sub, gi, false, true);
+          writeStats(r, sub, gi, false, true, (stage, team, which) =>
+            stageDates.buildingCol(block.kind, grp.building, rg, stage, team, which),
+          );
           let colMax: string | null = null;
           for (const row of grp.rows) {
             const v = hoDates.cell(block.kind, row.building, row.levelDisp, rg);
@@ -333,7 +343,9 @@ export function exportSnagMatrixToXlsx(args: {
           }
           writeHo(r, gi, false, true, colMax);
         });
-        writeStats(r, grp.subtotal, cols.length, true, true);
+        writeStats(r, grp.subtotal, cols.length, true, true, (stage, team, which) =>
+          stageDates.building(block.kind, grp.building, stage, team, which),
+        );
         writeHo(r, cols.length, true, true, hoDates.building(block.kind, grp.building));
         r++;
       }
@@ -351,18 +363,21 @@ export function exportSnagMatrixToXlsx(args: {
       { wch: 16 },
       { wch: 14 },
       ...Array.from({ length: totalCols - 2 }, (_, i) =>
-        showHoDate && i % GROUP_SPAN === PER_GROUP ? { wch: 9 } : { wch: 7 },
+        showHoDate && i % GROUP_SPAN === perGroup ? { wch: 9 } : { wch: 7 },
       ),
     ];
-    ws["!rows"] = [{ hpt: 22 }, { hpt: 18 }, { hpt: 6 }, { hpt: 20 }, { hpt: 16 }, { hpt: 16 }];
+    ws["!rows"] = dual
+      ? [{ hpt: 22 }, { hpt: 18 }, { hpt: 6 }, { hpt: 20 }, { hpt: 16 }, { hpt: 16 }, { hpt: 16 }]
+      : [{ hpt: 22 }, { hpt: 18 }, { hpt: 6 }, { hpt: 20 }, { hpt: 16 }, { hpt: 16 }];
     (ws as any)["!freeze"] = XLSX.utils.encode_cell({ r: DATA, c: 2 });
 
     const sheetName = block.title.replace(/[\\/?*[\]:]/g, "-").slice(0, 28) || block.kind;
     XLSX.utils.book_append_sheet(wb, ws, sheetName);
   }
 
-  const modeTag =
-    mode === "pct" ? "PCT" : mode === "remain" ? "REMAIN" : mode === "remainPct" ? "REMAIN-PCT" : "COUNT";
+  const modeTag = dual
+    ? "REMAIN-DATE"
+    : mode === "pct" ? "PCT" : mode === "remain" ? "REMAIN" : mode === "remainPct" ? "REMAIN-PCT" : "COUNT";
   const fileName = `CMS_SM_Dashboard_Matrix_PLOT-${matrix.plot}_${modeTag}_${asOf}.xlsx`;
   XLSX.writeFile(wb, fileName);
 }
