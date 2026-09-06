@@ -8,6 +8,8 @@ import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
 import { canAccessAbdOcs } from "@/lib/abd/ocs-access";
+import { canAccessPath } from "@/lib/auth/route-access";
+
 import { useQueryClient } from "@tanstack/react-query";
 import { TopBrandHeader } from "@/components/layout/TopBrandHeader";
 import { UpdateAvailableBanner } from "@/components/layout/UpdateAvailableBanner";
