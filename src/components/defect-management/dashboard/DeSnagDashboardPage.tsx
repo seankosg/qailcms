@@ -26,8 +26,6 @@ import { asOfHeaderLabel } from "@/lib/task-management/as-of";
 import {
   ALL_TEAMS,
   buildMatrix,
-  isLgRoomGroup,
-  LG_ROOM_GROUPS,
   mergeStats,
   newStats,
   normalizeRoomGroup,
@@ -59,9 +57,9 @@ export function DeSnagDashboardPage() {
         .split(",")
         .map((s: string) => s.trim())
         .filter((s: string): s is RoomGroupCol =>
-          (ROOM_GROUP_ORDER as readonly string[]).includes(s) ||
-          (LG_ROOM_GROUPS as readonly string[]).includes(s),
+          (ROOM_GROUP_ORDER as readonly string[]).includes(s),
         ),
+
     [search.roomGroups],
   );
 
@@ -254,34 +252,19 @@ export function DeSnagDashboardPage() {
     };
     const selected = new Set<string>(appliedRoomGroups as unknown as string[]);
     const cols = Object.keys(totals)
-      .filter((c) => !isLgRoomGroup(c))
       .filter((c) => (selected.size === 0 ? true : selected.has(c)))
       .filter((c) => get(c).issued > 0)
       .sort((a, b) => {
         const d = orderIdx(a) - orderIdx(b);
         return d !== 0 ? d : a.localeCompare(b);
       });
-    const base = cols.map((col) => ({
+    return cols.map((col) => ({
       col,
       label: col,
       param: paramFor(col),
       stats: get(col),
     }));
-    // LG (Lower Ground) — Podium 1~N 통합 카드
-    const lgPresent = LG_ROOM_GROUPS.filter(
-      (rg) => get(rg).issued > 0 && (selected.size === 0 || selected.has(rg)),
-    );
-    if (lgPresent.length > 0) {
-      const lgStats = newStats();
-      for (const rg of lgPresent) mergeStats(lgStats, get(rg));
-      base.push({
-        col: "__LG_PODIUM__",
-        label: "LG Podium",
-        param: lgPresent.flatMap((rg) => paramFor(rg).split(",")).join(","),
-        stats: lgStats,
-      });
-    }
-    return base;
+
   }, [matrix, appliedRoomGroups]);
 
   // 안내 문구용 — 데이터에 존재하는 전체 Room Group 수 (필터 적용 전)
@@ -292,12 +275,9 @@ export function DeSnagDashboardPage() {
 
   const roomGroupTotalCount = useMemo(() => {
     const totals = matrix.roomGroupTotals as Record<string, Stats>;
-    const plain = Object.keys(totals).filter(
-      (c) => !isLgRoomGroup(c) && (totals[c]?.issued ?? 0) > 0,
-    ).length;
-    const lg = LG_ROOM_GROUPS.some((rg) => (totals[rg]?.issued ?? 0) > 0) ? 1 : 0;
-    return plain + lg;
+    return Object.keys(totals).filter((c) => (totals[c]?.issued ?? 0) > 0).length;
   }, [matrix]);
+
 
   return (
     <div className="flex flex-col gap-4 p-4 md:p-6">

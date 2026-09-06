@@ -94,26 +94,18 @@ export const ROOM_GROUP_ORDER = [
   "LANDSCAPE",
   "Terrace",
   "VIP Drop Off (P5)",
-  "N/A",
-] as const;
-
-// LG (Lower Ground) 블록 전용 열 — building='LG' 행의 room_group 값
-export const LG_ROOM_GROUPS = [
   "Podium 1",
   "Podium 2",
   "Podium 3",
   "Podium 4",
   "Podium 5",
+  "N/A",
 ] as const;
 
-export const ALL_ROOM_GROUPS = [...ROOM_GROUP_ORDER, ...LG_ROOM_GROUPS] as const;
+export const ALL_ROOM_GROUPS = ROOM_GROUP_ORDER;
 
 export type RoomGroupCol = (typeof ALL_ROOM_GROUPS)[number];
-export type LgRoomGroupCol = (typeof LG_ROOM_GROUPS)[number];
 
-export function isLgRoomGroup(v: string): v is LgRoomGroupCol {
-  return (LG_ROOM_GROUPS as readonly string[]).includes(v);
-}
 
 export function normalizeRoomGroup(v: string | null | undefined): RoomGroupCol {
   const s = (v ?? "").trim().toUpperCase();
@@ -515,23 +507,18 @@ export function buildMatrix(
       mergeStats(blockTotal, row.rowTotal);
     }
 
-    const columnKeys: string[] =
-      kind === "lg"
-        ? (() => {
-            const present = LG_ROOM_GROUPS.filter((rg) => colTotals[rg].issued > 0);
-            return (present.length ? present : LG_ROOM_GROUPS.slice(0, 1)) as string[];
-          })()
-        : dynamicCols
-          ? (() => {
-              const keys = Object.keys(colTotals).filter((k) => colTotals[k].issued > 0);
-              const named = keys.filter((k) => k !== "N/A").sort((a, b) => a.localeCompare(b));
-              const hasNa = keys.includes("N/A");
-              return hasNa ? [...named, "N/A"] : named;
-            })()
-          : (() => {
-              const present = ROOM_GROUP_ORDER.filter((rg) => (colTotals[rg]?.issued ?? 0) > 0);
-              return (present.length ? present : ROOM_GROUP_ORDER.slice(0, 1)) as string[];
-            })();
+    const columnKeys: string[] = dynamicCols
+      ? (() => {
+          const keys = Object.keys(colTotals).filter((k) => colTotals[k].issued > 0);
+          const named = keys.filter((k) => k !== "N/A").sort((a, b) => a.localeCompare(b));
+          const hasNa = keys.includes("N/A");
+          return hasNa ? [...named, "N/A"] : named;
+        })()
+      : (() => {
+          const present = ROOM_GROUP_ORDER.filter((rg) => (colTotals[rg]?.issued ?? 0) > 0);
+          return (present.length ? present : ROOM_GROUP_ORDER.slice(0, 1)) as string[];
+        })();
+
 
     // 동적 열 블록: 모든 행에 열 키를 채워 렌더 시 undefined 접근을 막는다
     if (dynamicCols) {

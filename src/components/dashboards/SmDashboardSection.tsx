@@ -12,9 +12,8 @@ import { useUnionWindow } from "@/lib/charts/use-union-window";
 import {
   ALL_TEAMS,
   buildMatrix,
-  isLgRoomGroup,
-  LG_ROOM_GROUPS,
-  mergeStats,
+  
+
   newStats,
   normalizeRoomGroup,
   type PlotKey,
@@ -42,22 +41,13 @@ function useRoomGroupRows(plot: PlotKey, asOfDate: string, f: PdbSmFilters): Bre
       .roomGroupTotals as Record<string, Stats>;
     const get = (rg: string) => totals[rg] ?? newStats();
     const out: BreakdownRow[] = Object.keys(totals)
-      .filter((c) => !isLgRoomGroup(c) && get(c).issued > 0)
+      .filter((c) => get(c).issued > 0)
       .map((c) => ({
         key: c,
         count: get(c).issued,
         pct: get(c).issued > 0 ? (get(c).closed / get(c).issued) * 100 : null,
       }));
-    const lgPresent = LG_ROOM_GROUPS.filter((rg) => get(rg).issued > 0);
-    if (lgPresent.length > 0) {
-      const lg = newStats();
-      for (const rg of lgPresent) mergeStats(lg, get(rg));
-      out.push({
-        key: "LG Podium",
-        count: lg.issued,
-        pct: lg.issued > 0 ? (lg.closed / lg.issued) * 100 : null,
-      });
-    }
+
     return out.sort((a, b) => b.count - a.count || a.key.localeCompare(b.key));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [rawRows, plot, selectedKey, teams.join(",")]);
