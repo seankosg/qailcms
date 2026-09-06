@@ -94,26 +94,18 @@ export const ROOM_GROUP_ORDER = [
   "LANDSCAPE",
   "Terrace",
   "VIP Drop Off (P5)",
-  "N/A",
-] as const;
-
-// LG (Lower Ground) 블록 전용 열 — building='LG' 행의 room_group 값
-export const LG_ROOM_GROUPS = [
   "Podium 1",
   "Podium 2",
   "Podium 3",
   "Podium 4",
   "Podium 5",
+  "N/A",
 ] as const;
 
-export const ALL_ROOM_GROUPS = [...ROOM_GROUP_ORDER, ...LG_ROOM_GROUPS] as const;
+export const ALL_ROOM_GROUPS = ROOM_GROUP_ORDER;
 
 export type RoomGroupCol = (typeof ALL_ROOM_GROUPS)[number];
-export type LgRoomGroupCol = (typeof LG_ROOM_GROUPS)[number];
 
-export function isLgRoomGroup(v: string): v is LgRoomGroupCol {
-  return (LG_ROOM_GROUPS as readonly string[]).includes(v);
-}
 
 export function normalizeRoomGroup(v: string | null | undefined): RoomGroupCol {
   const s = (v ?? "").trim().toUpperCase();
