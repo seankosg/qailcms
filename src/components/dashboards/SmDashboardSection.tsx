@@ -12,9 +12,8 @@ import { useUnionWindow } from "@/lib/charts/use-union-window";
 import {
   ALL_TEAMS,
   buildMatrix,
-  isLgRoomGroup,
-  LG_ROOM_GROUPS,
   mergeStats,
+
   newStats,
   normalizeRoomGroup,
   type PlotKey,
