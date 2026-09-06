@@ -507,23 +507,18 @@ export function buildMatrix(
       mergeStats(blockTotal, row.rowTotal);
     }
 
-    const columnKeys: string[] =
-      kind === "lg"
-        ? (() => {
-            const present = LG_ROOM_GROUPS.filter((rg) => colTotals[rg].issued > 0);
-            return (present.length ? present : LG_ROOM_GROUPS.slice(0, 1)) as string[];
-          })()
-        : dynamicCols
-          ? (() => {
-              const keys = Object.keys(colTotals).filter((k) => colTotals[k].issued > 0);
-              const named = keys.filter((k) => k !== "N/A").sort((a, b) => a.localeCompare(b));
-              const hasNa = keys.includes("N/A");
-              return hasNa ? [...named, "N/A"] : named;
-            })()
-          : (() => {
-              const present = ROOM_GROUP_ORDER.filter((rg) => (colTotals[rg]?.issued ?? 0) > 0);
-              return (present.length ? present : ROOM_GROUP_ORDER.slice(0, 1)) as string[];
-            })();
+    const columnKeys: string[] = dynamicCols
+      ? (() => {
+          const keys = Object.keys(colTotals).filter((k) => colTotals[k].issued > 0);
+          const named = keys.filter((k) => k !== "N/A").sort((a, b) => a.localeCompare(b));
+          const hasNa = keys.includes("N/A");
+          return hasNa ? [...named, "N/A"] : named;
+        })()
+      : (() => {
+          const present = ROOM_GROUP_ORDER.filter((rg) => (colTotals[rg]?.issued ?? 0) > 0);
+          return (present.length ? present : ROOM_GROUP_ORDER.slice(0, 1)) as string[];
+        })();
+
 
     // 동적 열 블록: 모든 행에 열 키를 채워 렌더 시 undefined 접근을 막는다
     if (dynamicCols) {
