@@ -257,10 +257,14 @@ export function AppLayout({ children }: { children: ReactNode }) {
   }, []);
 
   // Guest / Super Guest: 허용되지 않은 경로로 나가는 링크 클릭을 차단(드릴다운 포함).
-  const restricted = !!me?.isGuest || !!me?.isSuperGuest;
+  const guestFlags = {
+    isGuest: me?.primaryRole === "guest" || (!!me && !me.primaryRole),
+    isSuperGuest: me?.primaryRole === "super_guest",
+  };
+  const restricted = guestFlags.isGuest || guestFlags.isSuperGuest;
   useEffect(() => {
     if (!restricted) return;
-    const flags = { isGuest: !!me?.isGuest, isSuperGuest: !!me?.isSuperGuest };
+    const flags = guestFlags;
     const onClick = (e: MouseEvent) => {
       const anchor = (e.target as HTMLElement | null)?.closest?.("a[href]") as HTMLAnchorElement | null;
       if (!anchor) return;
@@ -272,7 +276,8 @@ export function AppLayout({ children }: { children: ReactNode }) {
     };
     document.addEventListener("click", onClick, true);
     return () => document.removeEventListener("click", onClick, true);
-  }, [restricted, me?.isGuest, me?.isSuperGuest]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [restricted, guestFlags.isGuest, guestFlags.isSuperGuest]);
 
   const displayRoleLabel = me?.roleLabel
     ?? (me?.isDSuperUser ? "D.Superuser" : me?.isSuperUser ? "Superuser" : me?.isAdmin ? "Admin" : me?.isSeniorUser ? "Senior User" : me?.isUser ? "User" : me?.isSuperGuest ? "Super Guest" : "Guest");
@@ -284,7 +289,7 @@ export function AppLayout({ children }: { children: ReactNode }) {
     if (it.strictAdminOnly && !me?.isStrictAdmin) return false;
     if (it.editorOnly && !me?.isEditor) return false;
     // Guest / Super Guest 접근 게이트 (정본: @/lib/auth/route-access)
-    if (it.to && !canAccessPath({ isGuest: me?.isGuest, isSuperGuest: me?.isSuperGuest }, it.to)) return false;
+    if (it.to && !canAccessPath(guestFlags, it.to)) return false;
     return true;
   };
 

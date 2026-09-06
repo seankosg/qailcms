@@ -8,6 +8,9 @@ import { canAccessPath } from "@/lib/auth/route-access";
  */
 export function useCanNavigate() {
   const { data: me } = useCurrentUser();
-  const flags = { isGuest: !!me?.isGuest, isSuperGuest: !!me?.isSuperGuest };
+  const flags = {
+    isGuest: me?.primaryRole === "guest" || (!!me && !me.primaryRole),
+    isSuperGuest: me?.primaryRole === "super_guest",
+  };
   return useCallback((path: string) => canAccessPath(flags, path), [flags.isGuest, flags.isSuperGuest]);
 }
