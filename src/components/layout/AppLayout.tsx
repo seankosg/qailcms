@@ -8,6 +8,8 @@ import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
 import { canAccessAbdOcs } from "@/lib/abd/ocs-access";
+import { canAccessPath } from "@/lib/auth/route-access";
+
 import { useQueryClient } from "@tanstack/react-query";
 import { TopBrandHeader } from "@/components/layout/TopBrandHeader";
 import { UpdateAvailableBanner } from "@/components/layout/UpdateAvailableBanner";
@@ -254,16 +256,43 @@ export function AppLayout({ children }: { children: ReactNode }) {
     return () => window.removeEventListener("keydown", onKey);
   }, []);
 
+  // Guest / Super Guest: 허용되지 않은 경로로 나가는 링크 클릭을 차단(드릴다운 포함).
+  const guestFlags = {
+    isGuest: me?.primaryRole === "guest" || (!!me && !me.primaryRole),
+    isSuperGuest: me?.primaryRole === "super_guest",
+  };
+  const restricted = guestFlags.isGuest || guestFlags.isSuperGuest;
+  useEffect(() => {
+    if (!restricted) return;
+    const flags = guestFlags;
+    const onClick = (e: MouseEvent) => {
+      const anchor = (e.target as HTMLElement | null)?.closest?.("a[href]") as HTMLAnchorElement | null;
+      if (!anchor) return;
+      const href = anchor.getAttribute("href") ?? "";
+      if (!href.startsWith("/")) return;
+      if (canAccessPath(flags, href)) return;
+      e.preventDefault();
+      e.stopPropagation();
+    };
+    document.addEventListener("click", onClick, true);
+    return () => document.removeEventListener("click", onClick, true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [restricted, guestFlags.isGuest, guestFlags.isSuperGuest]);
+
   const displayRoleLabel = me?.roleLabel
     ?? (me?.isDSuperUser ? "D.Superuser" : me?.isSuperUser ? "Superuser" : me?.isAdmin ? "Admin" : me?.isSeniorUser ? "Senior User" : me?.isUser ? "User" : me?.isSuperGuest ? "Super Guest" : "Guest");
+
 
   const isVisible = (it: NavLeaf) => {
     if (it.abdOcsOnly) return canAccessAbdOcs({ userType: me?.userType, team: me?.team, isStrictAdmin: me?.isStrictAdmin });
     if (it.adminOnly && !me?.isAdmin) return false;
     if (it.strictAdminOnly && !me?.isStrictAdmin) return false;
     if (it.editorOnly && !me?.isEditor) return false;
+    // Guest / Super Guest 접근 게이트 (정본: @/lib/auth/route-access)
+    if (it.to && !canAccessPath(guestFlags, it.to)) return false;
     return true;
   };
+
 
   const toggleModule = (key: string, defaultOpen: boolean) => {
     setModuleOpen((prev) => {
@@ -430,7 +459,7 @@ export function AppLayout({ children }: { children: ReactNode }) {
               .filter((m) => !m.adminOnly || me?.isAdmin)
               .filter((m) => m.items.some(isVisible));
             const flatItems = (section.items ?? []).filter(isVisible);
-            const sectionDashboard = section.dashboard;
+            const sectionDashboard = section.dashboard && isVisible(section.dashboard) ? section.dashboard : undefined;
             const hasContent = !!sectionDashboard || modules.length > 0 || flatItems.length > 0;
             if (!hasContent) return null;
 
