@@ -256,8 +256,27 @@ export function AppLayout({ children }: { children: ReactNode }) {
     return () => window.removeEventListener("keydown", onKey);
   }, []);
 
+  // Guest / Super Guest: 허용되지 않은 경로로 나가는 링크 클릭을 차단(드릴다운 포함).
+  const restricted = !!me?.isGuest || !!me?.isSuperGuest;
+  useEffect(() => {
+    if (!restricted) return;
+    const flags = { isGuest: !!me?.isGuest, isSuperGuest: !!me?.isSuperGuest };
+    const onClick = (e: MouseEvent) => {
+      const anchor = (e.target as HTMLElement | null)?.closest?.("a[href]") as HTMLAnchorElement | null;
+      if (!anchor) return;
+      const href = anchor.getAttribute("href") ?? "";
+      if (!href.startsWith("/")) return;
+      if (canAccessPath(flags, href)) return;
+      e.preventDefault();
+      e.stopPropagation();
+    };
+    document.addEventListener("click", onClick, true);
+    return () => document.removeEventListener("click", onClick, true);
+  }, [restricted, me?.isGuest, me?.isSuperGuest]);
+
   const displayRoleLabel = me?.roleLabel
     ?? (me?.isDSuperUser ? "D.Superuser" : me?.isSuperUser ? "Superuser" : me?.isAdmin ? "Admin" : me?.isSeniorUser ? "Senior User" : me?.isUser ? "User" : me?.isSuperGuest ? "Super Guest" : "Guest");
+
 
   const isVisible = (it: NavLeaf) => {
     if (it.abdOcsOnly) return canAccessAbdOcs({ userType: me?.userType, team: me?.team, isStrictAdmin: me?.isStrictAdmin });
