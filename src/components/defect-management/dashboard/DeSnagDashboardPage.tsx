@@ -275,12 +275,9 @@ export function DeSnagDashboardPage() {
 
   const roomGroupTotalCount = useMemo(() => {
     const totals = matrix.roomGroupTotals as Record<string, Stats>;
-    const plain = Object.keys(totals).filter(
-      (c) => !isLgRoomGroup(c) && (totals[c]?.issued ?? 0) > 0,
-    ).length;
-    const lg = LG_ROOM_GROUPS.some((rg) => (totals[rg]?.issued ?? 0) > 0) ? 1 : 0;
-    return plain + lg;
+    return Object.keys(totals).filter((c) => (totals[c]?.issued ?? 0) > 0).length;
   }, [matrix]);
+
 
   return (
     <div className="flex flex-col gap-4 p-4 md:p-6">
