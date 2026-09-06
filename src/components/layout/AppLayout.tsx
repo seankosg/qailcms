@@ -435,7 +435,7 @@ export function AppLayout({ children }: { children: ReactNode }) {
               .filter((m) => !m.adminOnly || me?.isAdmin)
               .filter((m) => m.items.some(isVisible));
             const flatItems = (section.items ?? []).filter(isVisible);
-            const sectionDashboard = section.dashboard;
+            const sectionDashboard = section.dashboard && isVisible(section.dashboard) ? section.dashboard : undefined;
             const hasContent = !!sectionDashboard || modules.length > 0 || flatItems.length > 0;
             if (!hasContent) return null;
 
