@@ -262,8 +262,11 @@ export function AppLayout({ children }: { children: ReactNode }) {
     if (it.adminOnly && !me?.isAdmin) return false;
     if (it.strictAdminOnly && !me?.isStrictAdmin) return false;
     if (it.editorOnly && !me?.isEditor) return false;
+    // Guest / Super Guest 접근 게이트 (정본: @/lib/auth/route-access)
+    if (it.to && !canAccessPath({ isGuest: me?.isGuest, isSuperGuest: me?.isSuperGuest }, it.to)) return false;
     return true;
   };
+
 
   const toggleModule = (key: string, defaultOpen: boolean) => {
     setModuleOpen((prev) => {
