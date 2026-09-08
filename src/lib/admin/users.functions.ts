@@ -108,6 +108,9 @@ export const createAppUser = createServerFn({ method: "POST" })
   }) => input)
   .handler(async ({ data, context }) => {
     await assertStrictAdmin(context.supabase, context.userId);
+    if (data.role === "system_administrator") {
+      await assertSystemAdmin(context.supabase, context.userId);
+    }
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const loginId = data.login_id.trim().toLowerCase();
     if (!/^[a-z0-9._-]+$/.test(loginId)) {
@@ -179,8 +182,11 @@ export const updateUserRole = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input: { user_id: string; role: AppRole }) => input)
   .handler(async ({ data, context }) => {
-    // §5(2026-08-11) 역할 변경은 최상위 전용.
+    // §5(2026-09-08) 역할 변경은 Admin 이상. 단, 최상위 등급 부여는 최상위만.
     await assertStrictAdmin(context.supabase, context.userId);
+    if (data.role === "system_administrator") {
+      await assertSystemAdmin(context.supabase, context.userId);
+    }
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     // §6 최상위 계정 보호 — 최상위가 1명이면 그 등급을 바꿀 수 없다.
     {
