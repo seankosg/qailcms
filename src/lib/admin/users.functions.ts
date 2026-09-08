@@ -107,7 +107,7 @@ export const createAppUser = createServerFn({ method: "POST" })
     hdec_eng_name?: string | null;
   }) => input)
   .handler(async ({ data, context }) => {
-    await assertSystemAdmin(context.supabase, context.userId);
+    await assertStrictAdmin(context.supabase, context.userId);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const loginId = data.login_id.trim().toLowerCase();
     if (!/^[a-z0-9._-]+$/.test(loginId)) {
@@ -165,7 +165,7 @@ export const resetUserPassword = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input: { user_id: string; temp_password: string }) => input)
   .handler(async ({ data, context }) => {
-    await assertSystemAdmin(context.supabase, context.userId);
+    await assertStrictAdmin(context.supabase, context.userId);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { error } = await supabaseAdmin.auth.admin.updateUserById(data.user_id, {
       password: data.temp_password,
@@ -180,7 +180,7 @@ export const updateUserRole = createServerFn({ method: "POST" })
   .inputValidator((input: { user_id: string; role: AppRole }) => input)
   .handler(async ({ data, context }) => {
     // §5(2026-08-11) 역할 변경은 최상위 전용.
-    await assertSystemAdmin(context.supabase, context.userId);
+    await assertStrictAdmin(context.supabase, context.userId);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     // §6 최상위 계정 보호 — 최상위가 1명이면 그 등급을 바꿀 수 없다.
     {
@@ -281,7 +281,7 @@ export const deleteAppUser = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input: { user_id: string }) => input)
   .handler(async ({ data, context }) => {
-    await assertSystemAdmin(context.supabase, context.userId);
+    await assertStrictAdmin(context.supabase, context.userId);
     if (data.user_id === context.userId) throw new Error("본인 계정은 삭제할 수 없습니다.");
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     {
@@ -315,7 +315,7 @@ export const bulkResetTempPassword = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input: { temp_password: string }) => input)
   .handler(async ({ data, context }) => {
-    await assertSystemAdmin(context.supabase, context.userId);
+    await assertStrictAdmin(context.supabase, context.userId);
     const pw = String(data.temp_password ?? "");
     if (!/^(?=.*[A-Za-z])(?=.*\d).{6,}$/.test(pw)) {
       throw new Error("임시 비밀번호는 영문+숫자 포함 6자 이상이어야 합니다.");
@@ -498,7 +498,7 @@ export const bulkCreateAppUsers = createServerFn({ method: "POST" })
   }) => input)
   .handler(async ({ data, context }) => {
     // §5(2026-08-11) 계정 생성 경로는 개별·일괄 모두 최상위 전용이다.
-    await assertSystemAdmin(context.supabase, context.userId);
+    await assertStrictAdmin(context.supabase, context.userId);
     // 임시 비밀번호는 호출부가 준 값 하나를 전원에게 사용한다(생성 경로 단일화).
     const sharedPw = String(data.temp_password ?? "");
     if (!/^(?=.*[A-Za-z])(?=.*\d).{6,}$/.test(sharedPw)) {
