@@ -219,9 +219,9 @@ function UsersTab({ initialSearch = "" }: { initialSearch?: string }) {
   const { data, isLoading } = useQuery({ queryKey: ["admin-users"], queryFn: () => list({}) });
   const me = useCurrentUser();
   const callerIsAdmin = (me.data?.roles ?? []).includes("admin");
-  // §5(2026-08-11) 계정 조작(등급 변경 · 생성 · 삭제 · 비밀번호 초기화)은 서버가 최상위 전용이다.
-  // 화면 판정도 permissions.tsx 와 같은 방식(isSystemAdmin) 하나만 쓴다.
-  const canManageAccounts = !!me.data?.isSystemAdmin;
+  // §5(2026-09-08) 계정 조작(등급 변경 · 생성 · 삭제 · 비밀번호 초기화)은 서버가 Admin 이상 허용.
+  // 화면 판정도 같은 기준(isStrictAdmin = admin 또는 최상위) 하나만 쓴다.
+  const canManageAccounts = !!me.data?.isStrictAdmin;
   const invalidate = () => qc.invalidateQueries({ queryKey: ["admin-users"] });
   const teams = useTeamOptions();
 
@@ -300,7 +300,7 @@ function UsersTab({ initialSearch = "" }: { initialSearch?: string }) {
       {!canManageAccounts && (
         <div className="rounded-md border border-amber-500/40 bg-amber-500/5 px-3 py-2 text-sm">
           일부 조작이 잠겨 있습니다 — 등급 변경 · 계정 생성 · 계정 삭제 · 비밀번호 초기화(개별 · 일괄)는{" "}
-          <b>System Administrator</b> 계정만 할 수 있습니다. 조회 · 로그인 ID · 프로필 · 활성 토글 · Export 는 그대로 사용할 수 있습니다.
+          <b>Admin</b> 계정만 할 수 있습니다. 조회 · 로그인 ID · 프로필 · 활성 토글 · Export 는 그대로 사용할 수 있습니다.
         </div>
       )}
     <Card>
