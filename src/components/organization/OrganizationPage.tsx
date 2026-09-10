@@ -129,6 +129,22 @@ export function OrganizationPage() {
     return { active: build(activeRows), scheduled: build(scheduledRows) };
   }, [activeRows, scheduledRows]);
 
+  /** 팀별 부재자(진행 중 인계자)·부재예정자(예정 인계자) 인원 수 — 한 사람이 여러 팀 업무를 이관하면 팀별로 각각 집계 */
+  const teamAbsence = useMemo(() => {
+    const build = (list: Row[]) => {
+      const m = new Map<string, Set<string>>();
+      list.forEach((r) => {
+        const team = r.task?.team?.trim() || "(팀 미지정)";
+        if (!m.has(team)) m.set(team, new Set());
+        m.get(team)!.add(r.from_pic);
+      });
+      return Array.from(m.entries())
+        .map(([team, names]) => ({ team, count: names.size }))
+        .sort((a, b) => b.count - a.count || a.team.localeCompare(b.team));
+    };
+    return { active: build(activeRows), scheduled: build(scheduledRows) };
+  }, [activeRows, scheduledRows]);
+
   /** 사용자별 인계·인수 집계 — 단계별로 따로 센다 */
   const summarize = (list: Row[]) => {
     const m = new Map<string, { name: string; out: number; inn: number }>();
@@ -213,9 +229,9 @@ export function OrganizationPage() {
           icon={UserCog}
           label="진행 중 · 예정 이관"
           value={`${counts.active} · ${counts.scheduled}`}
-          sub={`${asOf} 기준 · 시작 전 위임`}
+          sub={`진행 중 인계자 ${givers.size}명 / 인수자 ${takers.size}명 · ${asOf} 기준`}
         />
-        <KpiCard icon={Users} label="인계자 / 인수자" value={`${givers.size} / ${takers.size}`} sub="진행 중 기준 인원 수" />
+        <TeamAbsenceCard active={teamAbsence.active} scheduled={teamAbsence.scheduled} />
       </div>
 
       <div className="grid gap-4 lg:grid-cols-2">
@@ -439,6 +455,49 @@ function GiverPeriodCard({ active, scheduled }: { active: GiverPeriod[]; schedul
           <div className="text-xs text-muted-foreground">인계자 · 부재기간</div>
           <Section title="진행 인계자" list={active} tone="text-foreground" />
           <Section title="예정 인계자" list={scheduled} tone="text-muted-foreground" />
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+type TeamCount = { team: string; count: number };
+
+/** 팀별 부재자(진행 중) · 부재예정자(예정) 인원 수 카드 */
+function TeamAbsenceCard({ active, scheduled }: { active: TeamCount[]; scheduled: TeamCount[] }) {
+  const scheduledMap = new Map(scheduled.map((t) => [t.team, t.count]));
+  const teams = active.map((t) => t.team);
+  scheduled.forEach((t) => { if (!teams.includes(t.team)) teams.push(t.team); });
+  const shown = teams
+    .map((team) => ({ team, a: active.find((t) => t.team === team)?.count ?? 0, s: scheduledMap.get(team) ?? 0 }))
+    .sort((x, y) => (y.a + y.s) - (x.a + x.s) || x.team.localeCompare(y.team));
+
+  return (
+    <Card>
+      <CardContent className="flex gap-3 p-4">
+        <div className="h-fit rounded-md bg-primary/10 p-2">
+          <Users className="h-4 w-4 text-primary" />
+        </div>
+        <div className="min-w-0 flex-1 space-y-1.5">
+          <div className="text-xs text-muted-foreground">부서별 현황 (팀별 부재자 · 부재예정자)</div>
+          {shown.length === 0 ? (
+            <div className="text-[11px] text-muted-foreground">—</div>
+          ) : (
+            <ul className="space-y-0.5">
+              {shown.slice(0, 6).map((t) => (
+                <li key={t.team} className="flex items-baseline justify-between gap-2 text-[11px]">
+                  <span className="truncate font-medium">{t.team}</span>
+                  <span className="shrink-0 tabular-nums text-muted-foreground">
+                    부재 <span className="font-medium text-foreground">{t.a}</span>
+                    {" · "}예정 <span className="font-medium text-foreground">{t.s}</span>
+                  </span>
+                </li>
+              ))}
+              {shown.length > 6 ? (
+                <li className="text-[11px] text-muted-foreground">외 {shown.length - 6}개 팀</li>
+              ) : null}
+            </ul>
+          )}
         </div>
       </CardContent>
     </Card>
