@@ -13,7 +13,7 @@ import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { todayInDoha } from "@/lib/time/doha";
-import { ArrowRight, Users, UserCog, CalendarClock, CheckCircle2, Pencil } from "lucide-react";
+import { ArrowRight, Users, UserCog, CalendarClock, Pencil } from "lucide-react";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
 import { DelegationEditDialog } from "./DelegationEditDialog";
 import { OrgChartTab } from "./OrgChartTab";
@@ -112,6 +112,23 @@ export function OrganizationPage() {
 
   const scheduledRows = useMemo(() => tagged.filter((t) => t.p === "scheduled").map((t) => t.r), [tagged]);
 
+  /** 인계자별 부재기간(위임 기간 최소 시작 ~ 최대 종료) — 진행 중 / 예정 각각 */
+  const giverPeriods = useMemo(() => {
+    const build = (list: Row[]) => {
+      const m = new Map<string, { name: string; start: string; end: string }>();
+      list.forEach((r) => {
+        const cur = m.get(r.from_pic);
+        if (!cur) m.set(r.from_pic, { name: r.from_pic, start: r.start_date, end: r.end_date });
+        else {
+          if (r.start_date < cur.start) cur.start = r.start_date;
+          if (r.end_date > cur.end) cur.end = r.end_date;
+        }
+      });
+      return Array.from(m.values()).sort((a, b) => a.start.localeCompare(b.start) || a.name.localeCompare(b.name));
+    };
+    return { active: build(activeRows), scheduled: build(scheduledRows) };
+  }, [activeRows, scheduledRows]);
+
   /** 사용자별 인계·인수 집계 — 단계별로 따로 센다 */
   const summarize = (list: Row[]) => {
     const m = new Map<string, { name: string; out: number; inn: number }>();
@@ -190,11 +207,15 @@ export function OrganizationPage() {
         </div>
       </div>
 
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        <KpiCard icon={UserCog} label="진행 중 이관" value={counts.active} sub={`${asOf} 기준`} />
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+        <GiverPeriodCard active={giverPeriods.active} scheduled={giverPeriods.scheduled} />
+        <KpiCard
+          icon={UserCog}
+          label="진행 중 · 예정 이관"
+          value={`${counts.active} · ${counts.scheduled}`}
+          sub={`${asOf} 기준 · 시작 전 위임`}
+        />
         <KpiCard icon={Users} label="인계자 / 인수자" value={`${givers.size} / ${takers.size}`} sub="진행 중 기준 인원 수" />
-        <KpiCard icon={CalendarClock} label="예정" value={counts.scheduled} sub="시작 전 위임" />
-        <KpiCard icon={CheckCircle2} label="종료 · 취소" value={`${counts.ended} · ${counts.cancelled}`} sub="원 담당자 복귀" />
       </div>
 
       <div className="grid gap-4 lg:grid-cols-2">
@@ -377,6 +398,47 @@ function KpiCard({ icon: Icon, label, value, sub }: { icon: typeof Users; label:
           <div className="text-xs text-muted-foreground">{label}</div>
           <div className="text-lg font-semibold leading-tight">{value}</div>
           <div className="text-[11px] text-muted-foreground">{sub}</div>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+type GiverPeriod = { name: string; start: string; end: string };
+
+/** 인계자 성명 + 부재기간(시작/완료) 카드 */
+function GiverPeriodCard({ active, scheduled }: { active: GiverPeriod[]; scheduled: GiverPeriod[] }) {
+  const Section = ({ title, list, tone }: { title: string; list: GiverPeriod[]; tone: string }) => (
+    <div className="min-w-0">
+      <div className={`text-[11px] font-medium ${tone}`}>{title}</div>
+      {list.length === 0 ? (
+        <div className="text-[11px] text-muted-foreground">—</div>
+      ) : (
+        <ul className="mt-0.5 space-y-0.5">
+          {list.slice(0, 4).map((g) => (
+            <li key={g.name} className="flex items-baseline justify-between gap-2 text-[11px]">
+              <span className="truncate font-medium">{g.name}</span>
+              <span className="shrink-0 tabular-nums text-muted-foreground">{g.start} ~ {g.end}</span>
+            </li>
+          ))}
+          {list.length > 4 ? (
+            <li className="text-[11px] text-muted-foreground">외 {list.length - 4}명</li>
+          ) : null}
+        </ul>
+      )}
+    </div>
+  );
+
+  return (
+    <Card>
+      <CardContent className="flex gap-3 p-4">
+        <div className="h-fit rounded-md bg-primary/10 p-2">
+          <CalendarClock className="h-4 w-4 text-primary" />
+        </div>
+        <div className="min-w-0 flex-1 space-y-2">
+          <div className="text-xs text-muted-foreground">인계자 · 부재기간</div>
+          <Section title="진행 인계자" list={active} tone="text-foreground" />
+          <Section title="예정 인계자" list={scheduled} tone="text-muted-foreground" />
         </div>
       </CardContent>
     </Card>
