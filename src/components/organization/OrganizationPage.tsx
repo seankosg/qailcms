@@ -190,11 +190,15 @@ export function OrganizationPage() {
         </div>
       </div>
 
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        <KpiCard icon={UserCog} label="진행 중 이관" value={counts.active} sub={`${asOf} 기준`} />
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+        <GiverPeriodCard active={giverPeriods.active} scheduled={giverPeriods.scheduled} />
+        <KpiCard
+          icon={UserCog}
+          label="진행 중 · 예정 이관"
+          value={`${counts.active} · ${counts.scheduled}`}
+          sub={`${asOf} 기준 · 시작 전 위임`}
+        />
         <KpiCard icon={Users} label="인계자 / 인수자" value={`${givers.size} / ${takers.size}`} sub="진행 중 기준 인원 수" />
-        <KpiCard icon={CalendarClock} label="예정" value={counts.scheduled} sub="시작 전 위임" />
-        <KpiCard icon={CheckCircle2} label="종료 · 취소" value={`${counts.ended} · ${counts.cancelled}`} sub="원 담당자 복귀" />
       </div>
 
       <div className="grid gap-4 lg:grid-cols-2">
