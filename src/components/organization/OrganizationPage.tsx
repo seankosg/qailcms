@@ -112,6 +112,23 @@ export function OrganizationPage() {
 
   const scheduledRows = useMemo(() => tagged.filter((t) => t.p === "scheduled").map((t) => t.r), [tagged]);
 
+  /** 인계자별 부재기간(위임 기간 최소 시작 ~ 최대 종료) — 진행 중 / 예정 각각 */
+  const giverPeriods = useMemo(() => {
+    const build = (list: Row[]) => {
+      const m = new Map<string, { name: string; start: string; end: string }>();
+      list.forEach((r) => {
+        const cur = m.get(r.from_pic);
+        if (!cur) m.set(r.from_pic, { name: r.from_pic, start: r.start_date, end: r.end_date });
+        else {
+          if (r.start_date < cur.start) cur.start = r.start_date;
+          if (r.end_date > cur.end) cur.end = r.end_date;
+        }
+      });
+      return Array.from(m.values()).sort((a, b) => a.start.localeCompare(b.start) || a.name.localeCompare(b.name));
+    };
+    return { active: build(activeRows), scheduled: build(scheduledRows) };
+  }, [activeRows, scheduledRows]);
+
   /** 사용자별 인계·인수 집계 — 단계별로 따로 센다 */
   const summarize = (list: Row[]) => {
     const m = new Map<string, { name: string; out: number; inn: number }>();
