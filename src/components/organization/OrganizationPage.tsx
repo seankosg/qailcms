@@ -213,9 +213,9 @@ export function OrganizationPage() {
           icon={UserCog}
           label="진행 중 · 예정 이관"
           value={`${counts.active} · ${counts.scheduled}`}
-          sub={`${asOf} 기준 · 시작 전 위임`}
+          sub={`진행 중 인계자 ${givers.size}명 / 인수자 ${takers.size}명 · ${asOf} 기준`}
         />
-        <KpiCard icon={Users} label="인계자 / 인수자" value={`${givers.size} / ${takers.size}`} sub="진행 중 기준 인원 수" />
+        <TeamAbsenceCard active={teamAbsence.active} scheduled={teamAbsence.scheduled} />
       </div>
 
       <div className="grid gap-4 lg:grid-cols-2">
