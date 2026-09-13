@@ -231,6 +231,16 @@ export function exportSnagMatrixToXlsx(args: {
       const base = 2 + gi * GROUP_SPAN;
       const bn_: Partial<Record<Slot, TeamKey | null>> = {};
       for (const m of STAGE_METRICS) bn_[m.slot] = bottleneckTeam(stats.byTeam, m.slot);
+      const totalIssued = TEAM_COL_ORDER.reduce((s, tk) => s + stats.byTeam[tk].issued, 0);
+      const isRemainMode = mode === "remain" || mode === "remainPct";
+      const readySlots: Record<Slot, boolean> = {
+        issued: false,
+        rect: isRemainMode && totalIssued > 0 && TEAM_COL_ORDER.every((tk) => stats.byTeam[tk].issued - stats.byTeam[tk].rect <= 0),
+        pre: false,
+        dar: false,
+        closed: isRemainMode && totalIssued > 0 && TEAM_COL_ORDER.every((tk) => stats.byTeam[tk].issued - stats.byTeam[tk].closed <= 0),
+        ho: isRemainMode && totalIssued > 0 && TEAM_COL_ORDER.every((tk) => stats.byTeam[tk].issued - stats.byTeam[tk].ho <= 0),
+      };
       SLOTS.forEach((sc, si) => {
         TEAM_COL_ORDER.forEach((team, ti) => {
           const t = stats.byTeam[team];
