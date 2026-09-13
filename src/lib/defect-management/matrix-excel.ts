@@ -231,6 +231,16 @@ export function exportSnagMatrixToXlsx(args: {
       const base = 2 + gi * GROUP_SPAN;
       const bn_: Partial<Record<Slot, TeamKey | null>> = {};
       for (const m of STAGE_METRICS) bn_[m.slot] = bottleneckTeam(stats.byTeam, m.slot);
+      const totalIssued = TEAM_COL_ORDER.reduce((s, tk) => s + stats.byTeam[tk].issued, 0);
+      const isRemainMode = mode === "remain" || mode === "remainPct";
+      const readySlots: Record<Slot, boolean> = {
+        issued: false,
+        rect: isRemainMode && totalIssued > 0 && TEAM_COL_ORDER.every((tk) => stats.byTeam[tk].issued - stats.byTeam[tk].rect <= 0),
+        pre: false,
+        dar: false,
+        closed: isRemainMode && totalIssued > 0 && TEAM_COL_ORDER.every((tk) => stats.byTeam[tk].issued - stats.byTeam[tk].closed <= 0),
+        ho: isRemainMode && totalIssued > 0 && TEAM_COL_ORDER.every((tk) => stats.byTeam[tk].issued - stats.byTeam[tk].ho <= 0),
+      };
       SLOTS.forEach((sc, si) => {
         TEAM_COL_ORDER.forEach((team, ti) => {
           const t = stats.byTeam[team];
@@ -241,14 +251,20 @@ export function exportSnagMatrixToXlsx(args: {
           const showPct = (mode === "pct" || mode === "remainPct") && sc.slot !== "issued";
           const ratio = t.issued > 0 ? count / t.issued : null;
           const bn = sc.slot !== "issued" && bn_[sc.slot] === team;
-          const bg = bn ? BOTTLENECK_BG : isTotalGroup || emphasize ? TOTAL_BG : GROUP_BG[gi % 2];
+          const readyBg =
+            readySlots[sc.slot]
+              ? sc.slot === "rect"
+                ? "FF38BDF8"
+                : "FF34D399"
+              : null;
+          const bg = bn ? BOTTLENECK_BG : readyBg ?? (isTotalGroup || emphasize ? TOTAL_BG : GROUP_BG[gi % 2]);
           let color = "FF111827";
           if (showPct && ratio != null) {
             const g = isRemain ? 1 - ratio : ratio;
             color = g < 0.4 ? "FFB91C1C" : g < 0.8 ? "FFB45309" : "FF047857";
           }
           else if (!showPct && count === 0) color = "FF9CA3AF";
-          const style = numCell({ bg, bold: emphasize || isTotalGroup || bn || sc.slot === "issued", color, pct: showPct });
+          const style = numCell({ bg, bold: emphasize || isTotalGroup || bn || readySlots[sc.slot] || sc.slot === "issued", color, pct: showPct });
           const v = showPct ? (ratio == null ? "–" : ratio) : count;
           const cBase = base + slotOffset(si, dual);
           if (eachDate && sc.slot !== "issued") {
