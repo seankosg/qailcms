@@ -169,7 +169,9 @@ function TeamCells({
         ? "ready-inspection"
         : sc.slot === "closed" && closedReady
           ? "ready-handover"
-          : null;
+          : sc.slot === "ho" && hoReady
+            ? "ready-handover"
+            : null;
     const zeroDim = !showPct && count === 0 ? "text-muted-foreground/50" : "text-foreground";
 
     // 날짜: 스테이지 완료(잔여 0) → 실적일 + 회색 반전, 그 외 → 계획일
