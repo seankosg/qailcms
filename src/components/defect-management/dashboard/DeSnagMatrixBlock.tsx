@@ -138,6 +138,10 @@ function TeamCells({
     isRemainMode &&
     totalIssued > 0 &&
     TEAM_COL_ORDER.every((tk) => stats.byTeam[tk].issued - stats.byTeam[tk].closed <= 0);
+  const hoReady =
+    isRemainMode &&
+    totalIssued > 0 &&
+    TEAM_COL_ORDER.every((tk) => stats.byTeam[tk].issued - stats.byTeam[tk].ho <= 0);
 
   /** Each Date 전용 모드(숫자 → 날짜 대체) */
   const dateOnly = !!stageDate && !dual;
