@@ -137,8 +137,11 @@ const NAV: NavSection[] = [
         icon: iconCertificate,
         matchPrefix: "/closure/toc",
         items: [
+          { to: "/closure/toc/dashboard", label: "Dashboard", icon: iconDashboard },
+          { to: "/closure/toc/progress", label: "Progress", icon: iconChartUp },
           { to: "/closure/toc/raw-data", label: "Raw Data", icon: iconDatabase },
         ],
+
       },
       {
         label: "Warranty & License",
