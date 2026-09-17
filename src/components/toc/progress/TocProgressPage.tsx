@@ -101,7 +101,8 @@ export function TocProgressPage() {
       for (const r of filtered) {
         const hit = stages.find((c) => {
           const st = r.stages[c.stage_code]?.st ?? "none";
-          return st !== "na" && st !== "none" && st !== "done";
+          // TOC 는 자료 미입력(none) 도 "아직 남은 단계"로 본다 — 실적 공란이 정상 상태인 밴드가 많다.
+          return st !== "na" && st !== "done";
         });
         if (hit) m.set(hit.stage_code, (m.get(hit.stage_code) ?? 0) + 1);
       }
