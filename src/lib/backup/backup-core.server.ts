@@ -127,6 +127,16 @@ const TABLE_SORT_KEYS: Record<BackupTableName, string[]> = {
   spl_document_item_links: ["id"],
   spl_document_pages: ["id"],
   spl_ocs_comment_document_links: ["id"],
+  toc_items: ["id"],
+  toc_stage_catalog: ["stage_code"],
+  toc_stage_progress: ["id"],
+  toc_training_sessions: ["id"],
+  toc_item_training_links: ["id"],
+  toc_training_comments: ["id"],
+  toc_change_log: ["id"],
+  toc_settings: ["key"],
+  toc_import_logs: ["id"],
+  toc_import_row_logs: ["id"],
 };
 
 function sortKeysFor(tableName: string): string[] {
@@ -236,6 +246,17 @@ export const RESTORE_ORDER = new Map<BackupTableName, number>([
   ["spl_ocs_comment_document_links", 81],
   ["spl_ocs_compliance", 82],
   ["spl_ocs_compliance_log", 83],
+  // TOC (Handover): 카탈로그 → 아이템 → 진행/세션 → 링크·코멘트 → 로그
+  ["toc_stage_catalog", 84],
+  ["toc_items", 85],
+  ["toc_stage_progress", 86],
+  ["toc_training_sessions", 87],
+  ["toc_item_training_links", 88],
+  ["toc_training_comments", 89],
+  ["toc_change_log", 90],
+  ["toc_settings", 91],
+  ["toc_import_logs", 92],
+  ["toc_import_row_logs", 93],
 ]);
 
 /**

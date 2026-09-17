@@ -7766,6 +7766,610 @@ export type Database = {
           },
         ]
       }
+      toc_change_log: {
+        Row: {
+          action: string
+          batch_id: string | null
+          changed_at: string
+          changed_by: string | null
+          column_name: string | null
+          id: string
+          item_id: string | null
+          item_key: string | null
+          new_value: string | null
+          old_value: string | null
+          row_id: string
+          session_id: string | null
+          source: string
+          stage_code: string | null
+          table_name: string
+        }
+        Insert: {
+          action: string
+          batch_id?: string | null
+          changed_at?: string
+          changed_by?: string | null
+          column_name?: string | null
+          id?: string
+          item_id?: string | null
+          item_key?: string | null
+          new_value?: string | null
+          old_value?: string | null
+          row_id: string
+          session_id?: string | null
+          source?: string
+          stage_code?: string | null
+          table_name: string
+        }
+        Update: {
+          action?: string
+          batch_id?: string | null
+          changed_at?: string
+          changed_by?: string | null
+          column_name?: string | null
+          id?: string
+          item_id?: string | null
+          item_key?: string | null
+          new_value?: string | null
+          old_value?: string | null
+          row_id?: string
+          session_id?: string | null
+          source?: string
+          stage_code?: string | null
+          table_name?: string
+        }
+        Relationships: []
+      }
+      toc_import_logs: {
+        Row: {
+          cleared_values: number
+          created_at: string
+          file_name: string
+          finished_at: string | null
+          id: string
+          imported_by: string | null
+          items_updated: number
+          matched: number
+          note: string | null
+          rollback_force: boolean
+          rolled_back_at: string | null
+          rolled_back_by: string | null
+          sessions_upserted: number
+          sheet_names: string[]
+          stages_upserted: number
+          started_at: string
+          status: string
+          total_rows: number
+          unmatched: number
+          updated_at: string
+        }
+        Insert: {
+          cleared_values?: number
+          created_at?: string
+          file_name: string
+          finished_at?: string | null
+          id?: string
+          imported_by?: string | null
+          items_updated?: number
+          matched?: number
+          note?: string | null
+          rollback_force?: boolean
+          rolled_back_at?: string | null
+          rolled_back_by?: string | null
+          sessions_upserted?: number
+          sheet_names?: string[]
+          stages_upserted?: number
+          started_at?: string
+          status?: string
+          total_rows?: number
+          unmatched?: number
+          updated_at?: string
+        }
+        Update: {
+          cleared_values?: number
+          created_at?: string
+          file_name?: string
+          finished_at?: string | null
+          id?: string
+          imported_by?: string | null
+          items_updated?: number
+          matched?: number
+          note?: string | null
+          rollback_force?: boolean
+          rolled_back_at?: string | null
+          rolled_back_by?: string | null
+          sessions_upserted?: number
+          sheet_names?: string[]
+          stages_upserted?: number
+          started_at?: string
+          status?: string
+          total_rows?: number
+          unmatched?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      toc_import_row_logs: {
+        Row: {
+          batch_id: string
+          changes: Json
+          code: string | null
+          created_at: string
+          detail: string | null
+          excel_row: number | null
+          id: string
+          item_key: string | null
+          outcome: string
+          session_key: string | null
+          sheet_name: string | null
+        }
+        Insert: {
+          batch_id: string
+          changes?: Json
+          code?: string | null
+          created_at?: string
+          detail?: string | null
+          excel_row?: number | null
+          id?: string
+          item_key?: string | null
+          outcome: string
+          session_key?: string | null
+          sheet_name?: string | null
+        }
+        Update: {
+          batch_id?: string
+          changes?: Json
+          code?: string | null
+          created_at?: string
+          detail?: string | null
+          excel_row?: number | null
+          id?: string
+          item_key?: string | null
+          outcome?: string
+          session_key?: string | null
+          sheet_name?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "toc_import_row_logs_batch_id_fkey"
+            columns: ["batch_id"]
+            isOneToOne: false
+            referencedRelation: "toc_import_logs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      toc_item_training_links: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          id: string
+          item_id: string
+          note: string | null
+          session_id: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          item_id: string
+          note?: string | null
+          session_id: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          item_id?: string
+          note?: string | null
+          session_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "toc_item_training_links_item_id_fkey"
+            columns: ["item_id"]
+            isOneToOne: false
+            referencedRelation: "toc_items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "toc_item_training_links_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: false
+            referencedRelation: "toc_training_sessions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      toc_items: {
+        Row: {
+          abd_filter: Json | null
+          abd_qty_code_a: number | null
+          abd_qty_total: number | null
+          created_at: string
+          created_by: string | null
+          data_date: string | null
+          eng: string | null
+          exclusion_reason: string | null
+          expected_ho_date: string | null
+          ho_status_raw: string | null
+          id: string
+          is_active: boolean
+          is_excluded: boolean
+          item_key: string
+          item_no: string | null
+          location: string | null
+          main_system: string | null
+          owner_user_id: string | null
+          pic: string | null
+          plot: string
+          service_report_required: boolean
+          source_file: string | null
+          source_row: number | null
+          source_sheet: string | null
+          sub_system: string | null
+          supplier: string | null
+          tac_qty_issued: number | null
+          tac_qty_total: number | null
+          team: string | null
+          team_raw: string | null
+          tm_task_nos: string[] | null
+          toc_ref: string | null
+          toc_status: string
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          abd_filter?: Json | null
+          abd_qty_code_a?: number | null
+          abd_qty_total?: number | null
+          created_at?: string
+          created_by?: string | null
+          data_date?: string | null
+          eng?: string | null
+          exclusion_reason?: string | null
+          expected_ho_date?: string | null
+          ho_status_raw?: string | null
+          id?: string
+          is_active?: boolean
+          is_excluded?: boolean
+          item_key: string
+          item_no?: string | null
+          location?: string | null
+          main_system?: string | null
+          owner_user_id?: string | null
+          pic?: string | null
+          plot?: string
+          service_report_required?: boolean
+          source_file?: string | null
+          source_row?: number | null
+          source_sheet?: string | null
+          sub_system?: string | null
+          supplier?: string | null
+          tac_qty_issued?: number | null
+          tac_qty_total?: number | null
+          team?: string | null
+          team_raw?: string | null
+          tm_task_nos?: string[] | null
+          toc_ref?: string | null
+          toc_status?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          abd_filter?: Json | null
+          abd_qty_code_a?: number | null
+          abd_qty_total?: number | null
+          created_at?: string
+          created_by?: string | null
+          data_date?: string | null
+          eng?: string | null
+          exclusion_reason?: string | null
+          expected_ho_date?: string | null
+          ho_status_raw?: string | null
+          id?: string
+          is_active?: boolean
+          is_excluded?: boolean
+          item_key?: string
+          item_no?: string | null
+          location?: string | null
+          main_system?: string | null
+          owner_user_id?: string | null
+          pic?: string | null
+          plot?: string
+          service_report_required?: boolean
+          source_file?: string | null
+          source_row?: number | null
+          source_sheet?: string | null
+          sub_system?: string | null
+          supplier?: string | null
+          tac_qty_issued?: number | null
+          tac_qty_total?: number | null
+          team?: string | null
+          team_raw?: string | null
+          tm_task_nos?: string[] | null
+          toc_ref?: string | null
+          toc_status?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: []
+      }
+      toc_settings: {
+        Row: {
+          key: string
+          updated_at: string
+          value: Json
+        }
+        Insert: {
+          key: string
+          updated_at?: string
+          value?: Json
+        }
+        Update: {
+          key?: string
+          updated_at?: string
+          value?: Json
+        }
+        Relationships: []
+      }
+      toc_stage_catalog: {
+        Row: {
+          actual_authority: string
+          band: string
+          chain_excluded: boolean
+          created_at: string
+          done_codes: string[]
+          gate_band: string | null
+          in_progress_denominator: boolean
+          label: string
+          module: string
+          note: string | null
+          short_code: string
+          sort_order: number
+          stage_code: string
+          updated_at: string
+          value_type: string
+        }
+        Insert: {
+          actual_authority?: string
+          band: string
+          chain_excluded?: boolean
+          created_at?: string
+          done_codes?: string[]
+          gate_band?: string | null
+          in_progress_denominator?: boolean
+          label: string
+          module?: string
+          note?: string | null
+          short_code: string
+          sort_order: number
+          stage_code: string
+          updated_at?: string
+          value_type: string
+        }
+        Update: {
+          actual_authority?: string
+          band?: string
+          chain_excluded?: boolean
+          created_at?: string
+          done_codes?: string[]
+          gate_band?: string | null
+          in_progress_denominator?: boolean
+          label?: string
+          module?: string
+          note?: string | null
+          short_code?: string
+          sort_order?: number
+          stage_code?: string
+          updated_at?: string
+          value_type?: string
+        }
+        Relationships: []
+      }
+      toc_stage_progress: {
+        Row: {
+          actual_finish: string | null
+          actual_start: string | null
+          code_value: string | null
+          created_at: string
+          created_by: string | null
+          data_date: string | null
+          id: string
+          item_id: string
+          na_flag: boolean
+          plan_finish: string | null
+          plan_start: string | null
+          remarks: string | null
+          stage_code: string
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          actual_finish?: string | null
+          actual_start?: string | null
+          code_value?: string | null
+          created_at?: string
+          created_by?: string | null
+          data_date?: string | null
+          id?: string
+          item_id: string
+          na_flag?: boolean
+          plan_finish?: string | null
+          plan_start?: string | null
+          remarks?: string | null
+          stage_code: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          actual_finish?: string | null
+          actual_start?: string | null
+          code_value?: string | null
+          created_at?: string
+          created_by?: string | null
+          data_date?: string | null
+          id?: string
+          item_id?: string
+          na_flag?: boolean
+          plan_finish?: string | null
+          plan_start?: string | null
+          remarks?: string | null
+          stage_code?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "toc_stage_progress_item_id_fkey"
+            columns: ["item_id"]
+            isOneToOne: false
+            referencedRelation: "toc_items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "toc_stage_progress_stage_code_fkey"
+            columns: ["stage_code"]
+            isOneToOne: false
+            referencedRelation: "toc_stage_catalog"
+            referencedColumns: ["stage_code"]
+          },
+        ]
+      }
+      toc_training_comments: {
+        Row: {
+          author_side: string
+          comment_date: string | null
+          comment_text: string | null
+          created_at: string
+          created_by: string | null
+          id: string
+          round: number
+          session_id: string
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          author_side: string
+          comment_date?: string | null
+          comment_text?: string | null
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          round: number
+          session_id: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          author_side?: string
+          comment_date?: string | null
+          comment_text?: string | null
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          round?: number
+          session_id?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "toc_training_comments_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: false
+            referencedRelation: "toc_training_sessions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      toc_training_sessions: {
+        Row: {
+          conducted_date: string | null
+          created_at: string
+          created_by: string | null
+          data_date: string | null
+          eval_form_date: string | null
+          eval_form_status: string | null
+          hdec_response_date: string | null
+          hdec_response2_date: string | null
+          id: string
+          ifm_feedback_date: string | null
+          ifm_review_date: string | null
+          ifm_status: string | null
+          is_active: boolean
+          mnl_doc_no: string | null
+          no_comments: boolean
+          plan_date: string | null
+          remarks: string | null
+          session_key: string
+          site_demo_date: string | null
+          source_file: string | null
+          subject: string | null
+          supplier: string | null
+          team: string | null
+          team_raw: string | null
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          conducted_date?: string | null
+          created_at?: string
+          created_by?: string | null
+          data_date?: string | null
+          eval_form_date?: string | null
+          eval_form_status?: string | null
+          hdec_response_date?: string | null
+          hdec_response2_date?: string | null
+          id?: string
+          ifm_feedback_date?: string | null
+          ifm_review_date?: string | null
+          ifm_status?: string | null
+          is_active?: boolean
+          mnl_doc_no?: string | null
+          no_comments?: boolean
+          plan_date?: string | null
+          remarks?: string | null
+          session_key: string
+          site_demo_date?: string | null
+          source_file?: string | null
+          subject?: string | null
+          supplier?: string | null
+          team?: string | null
+          team_raw?: string | null
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          conducted_date?: string | null
+          created_at?: string
+          created_by?: string | null
+          data_date?: string | null
+          eval_form_date?: string | null
+          eval_form_status?: string | null
+          hdec_response_date?: string | null
+          hdec_response2_date?: string | null
+          id?: string
+          ifm_feedback_date?: string | null
+          ifm_review_date?: string | null
+          ifm_status?: string | null
+          is_active?: boolean
+          mnl_doc_no?: string | null
+          no_comments?: boolean
+          plan_date?: string | null
+          remarks?: string | null
+          session_key?: string
+          site_demo_date?: string | null
+          source_file?: string | null
+          subject?: string | null
+          supplier?: string | null
+          team?: string | null
+          team_raw?: string | null
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: []
+      }
       user_roles: {
         Row: {
           created_at: string
@@ -8246,6 +8850,19 @@ export type Database = {
           sort_order: number | null
           spl_number: string | null
           stage_code: string | null
+          team: string | null
+          violation_type: string | null
+        }
+        Relationships: []
+      }
+      toc_precedence_violations: {
+        Row: {
+          detail: string | null
+          item_id: string | null
+          item_key: string | null
+          main_system: string | null
+          session_key: string | null
+          sub_system: string | null
           team: string | null
           violation_type: string | null
         }
@@ -10365,6 +10982,19 @@ export type Database = {
           _q?: string
         }
         Returns: Json
+      }
+      toc_assert_row_rules: { Args: { _item_id: string }; Returns: undefined }
+      toc_band_state: {
+        Args: { _as_of?: string; _band: string; _item_id: string }
+        Returns: string
+      }
+      toc_code_flag: {
+        Args: {
+          _code_value: string
+          _done_codes: string[]
+          _value_type: string
+        }
+        Returns: string
       }
       update_task_summary: {
         Args: { _discipline: string; _parent_task_no: string }

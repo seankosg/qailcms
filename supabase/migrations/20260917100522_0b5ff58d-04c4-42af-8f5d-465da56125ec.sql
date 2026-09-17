@@ -1,0 +1,1 @@
+ALTER VIEW public.toc_precedence_violations SET (security_invoker = on);
