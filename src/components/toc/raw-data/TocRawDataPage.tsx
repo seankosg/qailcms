@@ -276,9 +276,9 @@ export function TocRawDataPage() {
 
   const searchedRows = useMemo(() => {
     if (!q) return tabRows;
-    const terms = q
+    const terms = String(q)
       .split(",")
-      .map((t) => t.trim().toLowerCase())
+      .map((t: string) => t.trim().toLowerCase())
       .filter(Boolean);
     if (!terms.length) return tabRows;
     return tabRows.filter((r) => {
