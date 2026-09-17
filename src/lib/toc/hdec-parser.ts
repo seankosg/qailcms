@@ -253,9 +253,14 @@ export async function parseTocHdecFile(
 
     // ── 값 형태 검증 (헤더가 맞아도 형태가 다르면 강등) ────────────────────────
     const keyVals = dataRows.map((r) => String(cell(r, keyCol) ?? "").trim()).filter((s) => s !== "");
+    // 데이터 행이 아예 없는 시트(해당 Plot 항목 0건)는 빈 양식으로 보고 조용히 넘긴다 — 오류가 아니다.
+    if (keyVals.length === 0) {
+      sheets.push({ sheet_name: sheetName, plot, rows: 0 });
+      continue;
+    }
     const keyValid = keyVals.filter((s) => s.length >= 3 && /[A-Za-z]/.test(s));
-    const keyPct = keyVals.length === 0 ? 0 : Math.round((keyValid.length * 1000) / keyVals.length) / 10;
-    if (keyVals.length === 0 || keyPct < KEY_THRESHOLD) {
+    const keyPct = Math.round((keyValid.length * 1000) / keyVals.length) / 10;
+    if (keyPct < KEY_THRESHOLD) {
       throw new Error(
         `시트 "${sheetName}": ITEM KEY 값 형태가 맞는 비율 ${keyPct}% (모집단 ${keyVals.length}건, 임계 ${KEY_THRESHOLD}%) — 파싱을 중단했습니다. 표본: ${keyVals
           .slice(0, 3)
@@ -263,6 +268,7 @@ export async function parseTocHdecFile(
           .join(", ") || "(없음)"}`,
       );
     }
+
 
     const dropped = new Set<ColMap>();
     const checkShape = (cm: ColMap, kind: "date" | "number") => {
