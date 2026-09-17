@@ -10996,6 +10996,22 @@ export type Database = {
         }
         Returns: string
       }
+      toc_eval_as_of: {
+        Args: { _as_of?: string }
+        Returns: {
+          as_of: string
+          band_states: Json
+          delayed: number
+          item_id: string
+          judgment: string
+          primary_delay: Json
+          readiness_pct: number
+          ready_bands: number
+          ready_denom: number
+          stages: Json
+        }[]
+      }
+      toc_rows_as_of: { Args: { _as_of?: string }; Returns: Json }
       update_task_summary: {
         Args: { _discipline: string; _parent_task_no: string }
         Returns: undefined
