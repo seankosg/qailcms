@@ -255,7 +255,7 @@ export async function parseTocHdecFile(
     const keyVals = dataRows.map((r) => String(cell(r, keyCol) ?? "").trim()).filter((s) => s !== "");
     // 데이터 행이 아예 없는 시트(해당 Plot 항목 0건)는 빈 양식으로 보고 조용히 넘긴다 — 오류가 아니다.
     if (keyVals.length === 0) {
-      sheets.push({ sheet_name: sheetName, plot, rows: 0 });
+      out.sheets.push({ sheet_name: sheetName, plot, rows: 0 });
       continue;
     }
     const keyValid = keyVals.filter((s) => s.length >= 3 && /[A-Za-z]/.test(s));
