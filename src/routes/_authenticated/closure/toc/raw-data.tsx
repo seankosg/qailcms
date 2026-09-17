@@ -5,10 +5,12 @@ import { TocRawDataPage } from "@/components/toc/raw-data/TocRawDataPage";
 
 const searchSchema = z.object({
   asOf: z.string().optional().default(""),
-  team: z.string().optional().default("all"),
-  system: z.string().optional().default("all"),
-  judgment: z.string().optional().default("all"),
+  tab: z.string().optional().default("in_progress"),
   q: z.string().optional().default(""),
+  sort: z.string().optional().default(""),
+  filters: z.string().optional().default(""),
+  page: z.number().optional().default(1),
+  pageSize: z.union([z.number(), z.literal("all")]).optional().default(100),
 });
 
 export const Route = createFileRoute("/_authenticated/closure/toc/raw-data")({
