@@ -105,7 +105,18 @@ export type BackupTableName =
   | "spl_documents"
   | "spl_document_item_links"
   | "spl_document_pages"
-  | "spl_ocs_comment_document_links";
+  | "spl_ocs_comment_document_links"
+  // === TOC (Handover) ===
+  | "toc_items"
+  | "toc_stage_catalog"
+  | "toc_stage_progress"
+  | "toc_training_sessions"
+  | "toc_item_training_links"
+  | "toc_training_comments"
+  | "toc_change_log"
+  | "toc_settings"
+  | "toc_import_logs"
+  | "toc_import_row_logs";
 
 /**
  * 백업 대상 정본 목록.

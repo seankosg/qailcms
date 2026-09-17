@@ -3,7 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { evalScope, type RclScope } from "@/lib/auth/rcl-eval";
 
-export type RclModule = "TM" | "ABD" | "SM" | "SPL" | "WRT";
+export type RclModule = "TM" | "ABD" | "SM" | "SPL" | "WRT" | "TOC";
 export type RclAction = "read" | "write" | "delete" | "import" | "export";
 
 export interface RclGrants {
