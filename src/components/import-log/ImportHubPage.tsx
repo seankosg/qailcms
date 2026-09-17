@@ -5,6 +5,7 @@ import { AbdImportPage } from "@/components/abd/import/AbdImportPage";
 import { DmrImportPage } from "@/components/resource/dmr/DmrImportPage";
 import { SplImportPage } from "@/components/spl/import/SplImportPage";
 import { WrtImportPage } from "@/components/wrt/import/WrtImportPage";
+import { TocImportPage } from "@/components/toc/import/TocImportPage";
 import { getRouteApi } from "@tanstack/react-router";
 import { OcsIncrementImportPanel } from "@/components/abd/ocs/OcsIncrementImportPanel";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
@@ -42,6 +43,7 @@ export function ImportHubPage() {
           <TabsTrigger value="dmr">DMR</TabsTrigger>
           <TabsTrigger value="spl">Spare Parts</TabsTrigger>
           <TabsTrigger value="warranty">Warranty</TabsTrigger>
+          <TabsTrigger value="toc">Handover (TOC)</TabsTrigger>
         </TabsList>
         <TabsContent value="task" className="mt-4">
           <TaskManagementImportPage />
@@ -65,6 +67,9 @@ export function ImportHubPage() {
         </TabsContent>
         <TabsContent value="warranty" className="mt-4">
           <WrtImportPage />
+        </TabsContent>
+        <TabsContent value="toc" className="mt-4">
+          <TocImportPage />
         </TabsContent>
       </Tabs>
     </div>
