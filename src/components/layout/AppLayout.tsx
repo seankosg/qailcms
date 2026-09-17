@@ -133,6 +133,14 @@ const NAV: NavSection[] = [
         ],
       },
       {
+        label: "Handover (TOC)",
+        icon: iconCertificate,
+        matchPrefix: "/closure/toc",
+        items: [
+          { to: "/closure/toc/raw-data", label: "Raw Data", icon: iconDatabase },
+        ],
+      },
+      {
         label: "Warranty & License",
         icon: iconCertificate,
         matchPrefix: "/closure/warranty",
