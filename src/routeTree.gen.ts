@@ -50,6 +50,7 @@ import { Route as AuthenticatedResourceDmrProductivityRouteImport } from './rout
 import { Route as AuthenticatedResourceDmrEntryRouteImport } from './routes/_authenticated/resource/dmr/entry'
 import { Route as AuthenticatedResourceDmrDashboardRouteImport } from './routes/_authenticated/resource/dmr/dashboard'
 import { Route as AuthenticatedClosureWarrantyRawDataRouteImport } from './routes/_authenticated/closure/warranty/raw-data'
+import { Route as AuthenticatedClosureTocRawDataRouteImport } from './routes/_authenticated/closure/toc/raw-data'
 import { Route as AuthenticatedClosureTaskManagementTreeRouteImport } from './routes/_authenticated/closure/task-management/tree'
 import { Route as AuthenticatedClosureTaskManagementScheduleRevisionRouteImport } from './routes/_authenticated/closure/task-management/schedule-revision'
 import { Route as AuthenticatedClosureTaskManagementRawDataRouteImport } from './routes/_authenticated/closure/task-management/raw-data'
@@ -312,6 +313,12 @@ const AuthenticatedClosureWarrantyRawDataRoute =
     path: '/closure/warranty/raw-data',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
+const AuthenticatedClosureTocRawDataRoute =
+  AuthenticatedClosureTocRawDataRouteImport.update({
+    id: '/closure/toc/raw-data',
+    path: '/closure/toc/raw-data',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
 const AuthenticatedClosureTaskManagementTreeRoute =
   AuthenticatedClosureTaskManagementTreeRouteImport.update({
     id: '/closure/task-management/tree',
@@ -526,6 +533,7 @@ export interface FileRoutesByFullPath {
   '/closure/task-management/raw-data': typeof AuthenticatedClosureTaskManagementRawDataRoute
   '/closure/task-management/schedule-revision': typeof AuthenticatedClosureTaskManagementScheduleRevisionRoute
   '/closure/task-management/tree': typeof AuthenticatedClosureTaskManagementTreeRoute
+  '/closure/toc/raw-data': typeof AuthenticatedClosureTocRawDataRoute
   '/closure/warranty/raw-data': typeof AuthenticatedClosureWarrantyRawDataRoute
   '/resource/dmr/dashboard': typeof AuthenticatedResourceDmrDashboardRoute
   '/resource/dmr/entry': typeof AuthenticatedResourceDmrEntryRoute
@@ -595,6 +603,7 @@ export interface FileRoutesByTo {
   '/closure/task-management/raw-data': typeof AuthenticatedClosureTaskManagementRawDataRoute
   '/closure/task-management/schedule-revision': typeof AuthenticatedClosureTaskManagementScheduleRevisionRoute
   '/closure/task-management/tree': typeof AuthenticatedClosureTaskManagementTreeRoute
+  '/closure/toc/raw-data': typeof AuthenticatedClosureTocRawDataRoute
   '/closure/warranty/raw-data': typeof AuthenticatedClosureWarrantyRawDataRoute
   '/resource/dmr/dashboard': typeof AuthenticatedResourceDmrDashboardRoute
   '/resource/dmr/entry': typeof AuthenticatedResourceDmrEntryRoute
@@ -667,6 +676,7 @@ export interface FileRoutesById {
   '/_authenticated/closure/task-management/raw-data': typeof AuthenticatedClosureTaskManagementRawDataRoute
   '/_authenticated/closure/task-management/schedule-revision': typeof AuthenticatedClosureTaskManagementScheduleRevisionRoute
   '/_authenticated/closure/task-management/tree': typeof AuthenticatedClosureTaskManagementTreeRoute
+  '/_authenticated/closure/toc/raw-data': typeof AuthenticatedClosureTocRawDataRoute
   '/_authenticated/closure/warranty/raw-data': typeof AuthenticatedClosureWarrantyRawDataRoute
   '/_authenticated/resource/dmr/dashboard': typeof AuthenticatedResourceDmrDashboardRoute
   '/_authenticated/resource/dmr/entry': typeof AuthenticatedResourceDmrEntryRoute
@@ -739,6 +749,7 @@ export interface FileRouteTypes {
     | '/closure/task-management/raw-data'
     | '/closure/task-management/schedule-revision'
     | '/closure/task-management/tree'
+    | '/closure/toc/raw-data'
     | '/closure/warranty/raw-data'
     | '/resource/dmr/dashboard'
     | '/resource/dmr/entry'
@@ -808,6 +819,7 @@ export interface FileRouteTypes {
     | '/closure/task-management/raw-data'
     | '/closure/task-management/schedule-revision'
     | '/closure/task-management/tree'
+    | '/closure/toc/raw-data'
     | '/closure/warranty/raw-data'
     | '/resource/dmr/dashboard'
     | '/resource/dmr/entry'
@@ -879,6 +891,7 @@ export interface FileRouteTypes {
     | '/_authenticated/closure/task-management/raw-data'
     | '/_authenticated/closure/task-management/schedule-revision'
     | '/_authenticated/closure/task-management/tree'
+    | '/_authenticated/closure/toc/raw-data'
     | '/_authenticated/closure/warranty/raw-data'
     | '/_authenticated/resource/dmr/dashboard'
     | '/_authenticated/resource/dmr/entry'
@@ -1211,6 +1224,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedClosureWarrantyRawDataRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/closure/toc/raw-data': {
+      id: '/_authenticated/closure/toc/raw-data'
+      path: '/closure/toc/raw-data'
+      fullPath: '/closure/toc/raw-data'
+      preLoaderRoute: typeof AuthenticatedClosureTocRawDataRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/closure/task-management/tree': {
       id: '/_authenticated/closure/task-management/tree'
       path: '/closure/task-management/tree'
@@ -1489,6 +1509,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedClosureTaskManagementRawDataRoute: typeof AuthenticatedClosureTaskManagementRawDataRoute
   AuthenticatedClosureTaskManagementScheduleRevisionRoute: typeof AuthenticatedClosureTaskManagementScheduleRevisionRoute
   AuthenticatedClosureTaskManagementTreeRoute: typeof AuthenticatedClosureTaskManagementTreeRoute
+  AuthenticatedClosureTocRawDataRoute: typeof AuthenticatedClosureTocRawDataRoute
   AuthenticatedClosureWarrantyRawDataRoute: typeof AuthenticatedClosureWarrantyRawDataRoute
   AuthenticatedResourceDmrDashboardRoute: typeof AuthenticatedResourceDmrDashboardRoute
   AuthenticatedResourceDmrEntryRoute: typeof AuthenticatedResourceDmrEntryRoute
@@ -1553,6 +1574,7 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
     AuthenticatedClosureTaskManagementScheduleRevisionRoute,
   AuthenticatedClosureTaskManagementTreeRoute:
     AuthenticatedClosureTaskManagementTreeRoute,
+  AuthenticatedClosureTocRawDataRoute: AuthenticatedClosureTocRawDataRoute,
   AuthenticatedClosureWarrantyRawDataRoute:
     AuthenticatedClosureWarrantyRawDataRoute,
   AuthenticatedResourceDmrDashboardRoute:
