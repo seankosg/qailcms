@@ -76,7 +76,7 @@ function bandTooltip(row: TocRow, band: TocBand, catalog: TocCatalogEntry[]) {
     .map((c) => {
       const s = row.stages[c.stage_code];
       if (!s) return `${c.label}: —`;
-      const parts = [s.st];
+      const parts: string[] = [s.st];
       if (s.cv) parts.push(`code=${s.cv}`);
       if (s.pf) parts.push(`plan=${s.pf}`);
       if (s.af) parts.push(`actual=${s.af}`);
