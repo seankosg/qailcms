@@ -11011,6 +11011,15 @@ export type Database = {
           stages: Json
         }[]
       }
+      toc_hdec_apply: {
+        Args: {
+          _allow_deletes?: boolean
+          _batch_id: string
+          _delete_count?: number
+          _patches: Json
+        }
+        Returns: Json
+      }
       toc_rows_as_of: { Args: { _as_of?: string }; Returns: Json }
       update_task_summary: {
         Args: { _discipline: string; _parent_task_no: string }
