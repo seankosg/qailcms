@@ -35,6 +35,15 @@ const STATUS_COLS: Array<{ slot: StatusSlot; label: string }> = [
 ];
 
 const COLS_PER_GROUP = STATUS_COLS.length * TEAM_COL_ORDER.length; // 6 slots × 3 teams
+
+/** 매트릭스 스테이지 슬롯 → 진척 정본(snag_progress_events) 스테이지 키 */
+const REMAIN_STAGE_KEY: Record<string, string> = {
+  rect: "rectified",
+  pre: "pre_inspection",
+  dar: "dar_inspection",
+  closed: "closure",
+  ho: "ho",
+};
 /** 잔여+Date 모드: Issued 3열 + 스테이지 5개 × (잔여 3 + Date 3) */
 const COLS_PER_GROUP_DUAL =
   TEAM_COL_ORDER.length + STAGE_METRICS.length * TEAM_COL_ORDER.length * 2;
