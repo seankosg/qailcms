@@ -8143,6 +8143,51 @@ export type Database = {
         }
         Relationships: []
       }
+      toc_mech_system_map: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          id: string
+          is_active: boolean
+          item_key: string | null
+          note: string | null
+          plot: string
+          source_description: string
+          source_system: string
+          team: string
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          is_active?: boolean
+          item_key?: string | null
+          note?: string | null
+          plot?: string
+          source_description?: string
+          source_system?: string
+          team?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          is_active?: boolean
+          item_key?: string | null
+          note?: string | null
+          plot?: string
+          source_description?: string
+          source_system?: string
+          team?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: []
+      }
       toc_settings: {
         Row: {
           key: string

@@ -141,6 +141,7 @@ const NAV: NavSection[] = [
           { to: "/closure/toc/progress", label: "Progress", icon: iconChartUp },
           { to: "/closure/toc/raw-data", label: "Raw Data", icon: iconDatabase },
           { to: "/closure/toc/elec-map", label: "전기 T&C 대응표", icon: iconDatabase },
+          { to: "/closure/toc/mech-map", label: "설비 T&C 대응표", icon: iconDatabase },
         ],
 
       },
