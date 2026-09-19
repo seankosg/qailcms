@@ -7820,6 +7820,54 @@ export type Database = {
         }
         Relationships: []
       }
+      toc_elec_system_map: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          id: string
+          is_active: boolean
+          item_key: string | null
+          note: string | null
+          plot: string
+          source_description: string
+          source_sub: string
+          source_system: string
+          team: string
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          is_active?: boolean
+          item_key?: string | null
+          note?: string | null
+          plot?: string
+          source_description?: string
+          source_sub?: string
+          source_system?: string
+          team?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          is_active?: boolean
+          item_key?: string | null
+          note?: string | null
+          plot?: string
+          source_description?: string
+          source_sub?: string
+          source_system?: string
+          team?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: []
+      }
       toc_import_logs: {
         Row: {
           cleared_values: number
