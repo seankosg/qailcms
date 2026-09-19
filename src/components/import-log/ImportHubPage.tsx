@@ -6,6 +6,7 @@ import { DmrImportPage } from "@/components/resource/dmr/DmrImportPage";
 import { SplImportPage } from "@/components/spl/import/SplImportPage";
 import { WrtImportPage } from "@/components/wrt/import/WrtImportPage";
 import { TocImportPage } from "@/components/toc/import/TocImportPage";
+import { TocElecTcImportPage } from "@/components/toc/import/TocElecTcImportPage";
 import { getRouteApi } from "@tanstack/react-router";
 import { OcsIncrementImportPanel } from "@/components/abd/ocs/OcsIncrementImportPanel";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
@@ -44,6 +45,7 @@ export function ImportHubPage() {
           <TabsTrigger value="spl">Spare Parts</TabsTrigger>
           <TabsTrigger value="warranty">Warranty</TabsTrigger>
           <TabsTrigger value="toc">Handover (TOC)</TabsTrigger>
+          <TabsTrigger value="toc-elec">전기 T&amp;C 잔여</TabsTrigger>
         </TabsList>
         <TabsContent value="task" className="mt-4">
           <TaskManagementImportPage />
@@ -70,6 +72,9 @@ export function ImportHubPage() {
         </TabsContent>
         <TabsContent value="toc" className="mt-4">
           <TocImportPage />
+        </TabsContent>
+        <TabsContent value="toc-elec" className="mt-4">
+          <TocElecTcImportPage />
         </TabsContent>
       </Tabs>
     </div>
