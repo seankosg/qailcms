@@ -149,9 +149,12 @@ export const importTocElecTc = createServerFn({ method: "POST" })
 
     const gateRows = Array.from(merged.keys()).map((k) => {
       const it = byKey.get(k);
-      return { item_key: k, team: it?.team ?? null, pic: it?.pic ?? null, eng: it?.eng ?? null };
+      return {
+        key: k,
+        item: { team: s(it?.team), pic: s(it?.pic), eng: s(it?.eng) } as Record<string, string | null>,
+      };
     });
-    await assertImportScope(supa, "TOC", "item_key", ["team", "pic", "eng"], gateRows, (r) => r.item_key, null);
+    await assertImportScope(supa, "TOC", "item_key", ["team", "pic", "eng"], gateRows, (r) => r.key, null);
 
     const patches: any[] = [];
     let statusChanged = 0;
