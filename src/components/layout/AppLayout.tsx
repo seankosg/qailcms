@@ -140,6 +140,7 @@ const NAV: NavSection[] = [
           { to: "/closure/toc/dashboard", label: "Dashboard", icon: iconDashboard },
           { to: "/closure/toc/progress", label: "Progress", icon: iconChartUp },
           { to: "/closure/toc/raw-data", label: "Raw Data", icon: iconDatabase },
+          { to: "/closure/toc/elec-map", label: "전기 T&C 대응표", icon: iconDatabase },
         ],
 
       },

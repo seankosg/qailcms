@@ -35,6 +35,7 @@ const MANAGE_PREFIXES = [
   "/closure/snag-management/import",
   "/closure/abd/import",
   "/closure/toc/import",
+  "/closure/toc/elec-map",
   "/closure/snag-management/settings",
   "/closure/task-management/schedule-revision",
   "/resource/dmr/entry",
