@@ -490,6 +490,9 @@ export function DeSnagMatrixBlock({
     ? { building: buildingMembers.join(",") }
     : {};
 
+  // 잔여 계열 표시(잔여 개수·잔여 %·잔여+Date·Each Date)에서는 드릴다운도 잔여로 맞춘다.
+  const isRemain = remainDate || eachDate || mode === "remain" || mode === "remainPct";
+
   const goCell = (
     rowBuilding: string | null,
     rowLevelDisp: string | null,
