@@ -35,6 +35,15 @@ const STATUS_COLS: Array<{ slot: StatusSlot; label: string }> = [
 ];
 
 const COLS_PER_GROUP = STATUS_COLS.length * TEAM_COL_ORDER.length; // 6 slots × 3 teams
+
+/** 매트릭스 스테이지 슬롯 → 진척 정본(snag_progress_events) 스테이지 키 */
+const REMAIN_STAGE_KEY: Record<string, string> = {
+  rect: "rectified",
+  pre: "pre_inspection",
+  dar: "dar_inspection",
+  closed: "closure",
+  ho: "ho",
+};
 /** 잔여+Date 모드: Issued 3열 + 스테이지 5개 × (잔여 3 + Date 3) */
 const COLS_PER_GROUP_DUAL =
   TEAM_COL_ORDER.length + STAGE_METRICS.length * TEAM_COL_ORDER.length * 2;
@@ -490,6 +499,9 @@ export function DeSnagMatrixBlock({
     ? { building: buildingMembers.join(",") }
     : {};
 
+  // 잔여 계열 표시(잔여 개수·잔여 %·잔여+Date·Each Date)에서는 드릴다운도 잔여로 맞춘다.
+  const isRemain = remainDate || eachDate || mode === "remain" || mode === "remainPct";
+
   const goCell = (
     rowBuilding: string | null,
     rowLevelDisp: string | null,
@@ -511,9 +523,20 @@ export function DeSnagMatrixBlock({
       if (col !== "__ROW_TOTAL__" && col !== "__BUILDING_SUBTOTAL__") p.roomGroup = srcRG(col);
     }
     p.team = team;
-    // 정본(_snag_done_asof) 동치: 자기 실적일 ≤ as-of. dateEnd 는 상위에서 as-of 로 채움.
     const sm = STAGE_METRICS.find((m) => m.slot === slot);
-    if (sm) p.dateField = sm.dateField;
+    if (sm) {
+      if (isRemain) {
+        // 잔여 계열 셀: 정본(_snag_done_asof) 미완료 항목만. asOf 는 상위 goRaw 가 채운다.
+        p.cellStage = REMAIN_STAGE_KEY[sm.slot];
+        p.cellField = "planned";
+        p.cellFrom = "0001-01-01";
+        p.cellTo = "9999-12-31";
+        p.cellMode = "remaining";
+      } else {
+        // 개수·% 모드: 자기 실적일 ≤ as-of(완료). dateEnd 는 상위에서 as-of 로 채움.
+        p.dateField = sm.dateField;
+      }
+    }
     onNavigate(p);
   };
 

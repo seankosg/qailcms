@@ -866,12 +866,23 @@ export function DefectRawDataPage() {
     if (urlSearch.notClosureDone === "true") chips.push({ label: "Closure ≠ Done", clears: ["notClosureDone"] });
     if (urlSearch.hdecVerification) chips.push({ label: `HDEC Verification: ${urlSearch.hdecVerification === EMPTY_TOKEN ? "(Blank)" : urlSearch.hdecVerification}`, clears: ["hdecVerification"] });
     if (urlSearch.cellStage && urlSearch.cellFrom) {
-      const f = urlSearch.cellField === "actual" ? "Actual" : "Plan";
-      const range = urlSearch.cellTo && urlSearch.cellTo !== urlSearch.cellFrom ? `${urlSearch.cellFrom} → ${urlSearch.cellTo}` : String(urlSearch.cellFrom);
-      chips.push({
-        label: `Cell: ${urlSearch.cellStage} ${f} ${range}${urlSearch.cellMode === "remaining" ? " (remaining)" : ""}`,
-        clears: CELL_PARAMS,
-      });
+      const remainAll =
+        urlSearch.cellMode === "remaining" &&
+        urlSearch.cellField !== "actual" &&
+        String(urlSearch.cellFrom) <= "0001-01-01";
+      if (remainAll) {
+        chips.push({
+          label: `Remaining — ${urlSearch.cellStage}${urlSearch.asOf ? ` @ ${urlSearch.asOf}` : ""}`,
+          clears: CELL_PARAMS,
+        });
+      } else {
+        const f = urlSearch.cellField === "actual" ? "Actual" : "Plan";
+        const range = urlSearch.cellTo && urlSearch.cellTo !== urlSearch.cellFrom ? `${urlSearch.cellFrom} → ${urlSearch.cellTo}` : String(urlSearch.cellFrom);
+        chips.push({
+          label: `Cell: ${urlSearch.cellStage} ${f} ${range}${urlSearch.cellMode === "remaining" ? " (remaining)" : ""}`,
+          clears: CELL_PARAMS,
+        });
+      }
     }
     if (urlSearch.catADispute === "xor") chips.push({ label: "Cat A Dispute (LL ≠ HDEC)", clears: ["catADispute"] });
     if (urlSearch.noPlanStages) {
