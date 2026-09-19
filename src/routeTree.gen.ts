@@ -52,6 +52,7 @@ import { Route as AuthenticatedResourceDmrDashboardRouteImport } from './routes/
 import { Route as AuthenticatedClosureWarrantyRawDataRouteImport } from './routes/_authenticated/closure/warranty/raw-data'
 import { Route as AuthenticatedClosureTocRawDataRouteImport } from './routes/_authenticated/closure/toc/raw-data'
 import { Route as AuthenticatedClosureTocProgressRouteImport } from './routes/_authenticated/closure/toc/progress'
+import { Route as AuthenticatedClosureTocMechMapRouteImport } from './routes/_authenticated/closure/toc/mech-map'
 import { Route as AuthenticatedClosureTocElecMapRouteImport } from './routes/_authenticated/closure/toc/elec-map'
 import { Route as AuthenticatedClosureTocDashboardRouteImport } from './routes/_authenticated/closure/toc/dashboard'
 import { Route as AuthenticatedClosureTaskManagementTreeRouteImport } from './routes/_authenticated/closure/task-management/tree'
@@ -328,6 +329,12 @@ const AuthenticatedClosureTocProgressRoute =
     path: '/closure/toc/progress',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
+const AuthenticatedClosureTocMechMapRoute =
+  AuthenticatedClosureTocMechMapRouteImport.update({
+    id: '/closure/toc/mech-map',
+    path: '/closure/toc/mech-map',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
 const AuthenticatedClosureTocElecMapRoute =
   AuthenticatedClosureTocElecMapRouteImport.update({
     id: '/closure/toc/elec-map',
@@ -556,6 +563,7 @@ export interface FileRoutesByFullPath {
   '/closure/task-management/tree': typeof AuthenticatedClosureTaskManagementTreeRoute
   '/closure/toc/dashboard': typeof AuthenticatedClosureTocDashboardRoute
   '/closure/toc/elec-map': typeof AuthenticatedClosureTocElecMapRoute
+  '/closure/toc/mech-map': typeof AuthenticatedClosureTocMechMapRoute
   '/closure/toc/progress': typeof AuthenticatedClosureTocProgressRoute
   '/closure/toc/raw-data': typeof AuthenticatedClosureTocRawDataRoute
   '/closure/warranty/raw-data': typeof AuthenticatedClosureWarrantyRawDataRoute
@@ -629,6 +637,7 @@ export interface FileRoutesByTo {
   '/closure/task-management/tree': typeof AuthenticatedClosureTaskManagementTreeRoute
   '/closure/toc/dashboard': typeof AuthenticatedClosureTocDashboardRoute
   '/closure/toc/elec-map': typeof AuthenticatedClosureTocElecMapRoute
+  '/closure/toc/mech-map': typeof AuthenticatedClosureTocMechMapRoute
   '/closure/toc/progress': typeof AuthenticatedClosureTocProgressRoute
   '/closure/toc/raw-data': typeof AuthenticatedClosureTocRawDataRoute
   '/closure/warranty/raw-data': typeof AuthenticatedClosureWarrantyRawDataRoute
@@ -705,6 +714,7 @@ export interface FileRoutesById {
   '/_authenticated/closure/task-management/tree': typeof AuthenticatedClosureTaskManagementTreeRoute
   '/_authenticated/closure/toc/dashboard': typeof AuthenticatedClosureTocDashboardRoute
   '/_authenticated/closure/toc/elec-map': typeof AuthenticatedClosureTocElecMapRoute
+  '/_authenticated/closure/toc/mech-map': typeof AuthenticatedClosureTocMechMapRoute
   '/_authenticated/closure/toc/progress': typeof AuthenticatedClosureTocProgressRoute
   '/_authenticated/closure/toc/raw-data': typeof AuthenticatedClosureTocRawDataRoute
   '/_authenticated/closure/warranty/raw-data': typeof AuthenticatedClosureWarrantyRawDataRoute
@@ -781,6 +791,7 @@ export interface FileRouteTypes {
     | '/closure/task-management/tree'
     | '/closure/toc/dashboard'
     | '/closure/toc/elec-map'
+    | '/closure/toc/mech-map'
     | '/closure/toc/progress'
     | '/closure/toc/raw-data'
     | '/closure/warranty/raw-data'
@@ -854,6 +865,7 @@ export interface FileRouteTypes {
     | '/closure/task-management/tree'
     | '/closure/toc/dashboard'
     | '/closure/toc/elec-map'
+    | '/closure/toc/mech-map'
     | '/closure/toc/progress'
     | '/closure/toc/raw-data'
     | '/closure/warranty/raw-data'
@@ -929,6 +941,7 @@ export interface FileRouteTypes {
     | '/_authenticated/closure/task-management/tree'
     | '/_authenticated/closure/toc/dashboard'
     | '/_authenticated/closure/toc/elec-map'
+    | '/_authenticated/closure/toc/mech-map'
     | '/_authenticated/closure/toc/progress'
     | '/_authenticated/closure/toc/raw-data'
     | '/_authenticated/closure/warranty/raw-data'
@@ -1277,6 +1290,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedClosureTocProgressRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/closure/toc/mech-map': {
+      id: '/_authenticated/closure/toc/mech-map'
+      path: '/closure/toc/mech-map'
+      fullPath: '/closure/toc/mech-map'
+      preLoaderRoute: typeof AuthenticatedClosureTocMechMapRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/closure/toc/elec-map': {
       id: '/_authenticated/closure/toc/elec-map'
       path: '/closure/toc/elec-map'
@@ -1571,6 +1591,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedClosureTaskManagementTreeRoute: typeof AuthenticatedClosureTaskManagementTreeRoute
   AuthenticatedClosureTocDashboardRoute: typeof AuthenticatedClosureTocDashboardRoute
   AuthenticatedClosureTocElecMapRoute: typeof AuthenticatedClosureTocElecMapRoute
+  AuthenticatedClosureTocMechMapRoute: typeof AuthenticatedClosureTocMechMapRoute
   AuthenticatedClosureTocProgressRoute: typeof AuthenticatedClosureTocProgressRoute
   AuthenticatedClosureTocRawDataRoute: typeof AuthenticatedClosureTocRawDataRoute
   AuthenticatedClosureWarrantyRawDataRoute: typeof AuthenticatedClosureWarrantyRawDataRoute
@@ -1639,6 +1660,7 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
     AuthenticatedClosureTaskManagementTreeRoute,
   AuthenticatedClosureTocDashboardRoute: AuthenticatedClosureTocDashboardRoute,
   AuthenticatedClosureTocElecMapRoute: AuthenticatedClosureTocElecMapRoute,
+  AuthenticatedClosureTocMechMapRoute: AuthenticatedClosureTocMechMapRoute,
   AuthenticatedClosureTocProgressRoute: AuthenticatedClosureTocProgressRoute,
   AuthenticatedClosureTocRawDataRoute: AuthenticatedClosureTocRawDataRoute,
   AuthenticatedClosureWarrantyRawDataRoute:
