@@ -10016,7 +10016,7 @@ export type Database = {
           _buildings?: string[]
           _group_by: string[]
           _plan_groups: string[]
-          _plan_mode: string
+          _plan_mode?: string
           _room_groups: string[]
           _teams: string[]
         }

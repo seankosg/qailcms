@@ -433,11 +433,20 @@ export function SnagProgressPage() {
     if (stage !== "all") params.set("stage", stage);
     params.set("asOf", asOfDate);
     if (kind === "plan") {
-      params.set("dateField", stageDateField(stage, "planned"));
-      params.set("dateEnd", asOfDate);
+      // 계획 누계 드릴다운은 집계와 같은 정본(snag_progress_events)을 경유한다.
+      // Remaining(이동형)에서는 완료 단계의 계획일이 실제 완료일로 이동하므로,
+      // 계획일 컬럼 범위 필터로는 집계 숫자와 어긋난다.
+      params.set("cellStage", stage === "all" ? effectiveStages.join(",") : stage);
+      params.set("cellField", "planned");
+      params.set("cellFrom", "1900-01-01");
+      params.set("cellTo", asOfDate);
+      params.set("cellMode", planMode);
     } else if (kind === "actual") {
-      params.set("dateField", stageDateField(stage, "actual"));
-      params.set("dateEnd", asOfDate);
+      params.set("cellStage", stage === "all" ? effectiveStages.join(",") : stage);
+      params.set("cellField", "actual");
+      params.set("cellFrom", "1900-01-01");
+      params.set("cellTo", asOfDate);
+      params.set("cellMode", planMode);
     } else if (kind === "noplan") {
       // NO PLAN: 해당 스테이지 계획일 NULL(실적일도 NULL) — totals 의 no_plan 정의와 동일.
       // 총계는 표시 중인 스테이지 조합의 합집합(OR) = 문서 distinct 기준.
