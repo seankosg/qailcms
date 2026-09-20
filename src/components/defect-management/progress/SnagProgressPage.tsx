@@ -104,8 +104,10 @@ export function SnagProgressPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [search.dataDate]);
 
-  const rangeStart = useMemo(() => addDays(today, -14), [today]);
-  const rangeEnd = useMemo(() => addDays(today, rangeDays), [today, rangeDays]);
+  // 표시 구간·"오늘 선" 은 As-of 기준으로 고정한다(완료 판정도 As-of 기준 → 기준일을 과거로 바꿔도 어긋나지 않음)
+  const anchor = asOfDate;
+  const rangeStart = useMemo(() => addDays(anchor, -14), [anchor]);
+  const rangeEnd = useMemo(() => addDays(anchor, rangeDays), [anchor, rangeDays]);
   const rpcStart = bucket === "week" ? weekStartIso(rangeStart) : rangeStart;
   const rpcEnd = rangeEnd;
 
@@ -252,7 +254,7 @@ export function SnagProgressPage() {
       const CUM_ISO = cumIso;
       let visStart = 0;
       if (hidePast) {
-        const t = result.buckets.findIndex((b) => b >= today);
+        const t = result.buckets.findIndex((b) => b >= anchor);
         if (t > visStart) visStart = t;
       }
       // 그룹키/스테이지별 7/21 누계 조회 맵
@@ -301,7 +303,7 @@ export function SnagProgressPage() {
     }
     // Week 뷰: 기존 hidePast 슬라이스만 유지
     if (!hidePast) return result;
-    const startIdx = result.buckets.findIndex((b) => b >= today);
+    const startIdx = result.buckets.findIndex((b) => b >= anchor);
     if (startIdx <= 0) return result;
     const newBuckets = result.buckets.slice(startIdx);
     const rows = result.rows.map((r) => ({
@@ -316,7 +318,7 @@ export function SnagProgressPage() {
       ),
     }));
     return { buckets: newBuckets, rows };
-  }, [cellsQ.data, totalsQ.data, totalsCumQ.data, buckets, effectiveStages, hidePast, today, bucket, cumIso]);
+  }, [cellsQ.data, totalsQ.data, totalsCumQ.data, buckets, effectiveStages, hidePast, anchor, bucket, cumIso]);
 
   const kpis = useMemo(() => {
     const byStage: Record<Stage, { plan: number; actual: number; done: number; total: number; noPlan: number }> =
@@ -773,7 +775,7 @@ export function SnagProgressPage() {
                     data={matrix}
                     bucket={bucket}
                     stagesToShow={effectiveStages}
-                    today={today}
+                    today={anchor}
                     asOfLabel={asOfLabel}
                     groupHeader={groupHeader}
                     onCellClick={handleCellClick}
@@ -787,7 +789,7 @@ export function SnagProgressPage() {
             cells={cellsQ.data ?? []}
             buckets={buckets}
             stages={effectiveStages}
-            today={today}
+            today={anchor}
             cum={scurveCum}
             bucket={bucket}
             denomByStage={Object.fromEntries(
