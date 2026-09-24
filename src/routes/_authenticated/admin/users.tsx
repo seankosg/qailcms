@@ -631,6 +631,7 @@ function NewUserDialog({ onCreated, disabled = false }: { onCreated: () => void;
   const [team, setTeam] = useState<string>("__none__");
   const [subName, setSubName] = useState<string>("");
   const [subsubName, setSubsubName] = useState<string>("");
+  const [addRoster, setAddRoster] = useState(true);
   const subList = useMasterList("subcontractor");
   const subsubList = useMasterList("subsub");
 
@@ -655,6 +656,7 @@ function NewUserDialog({ onCreated, disabled = false }: { onCreated: () => void;
           subsub_name: userType === "subsub" ? (subsubName || null) : null,
           hdec_pic_name: (userType === "hdec" || userType === "hdec_pic") ? (displayName.trim() || null) : null,
           hdec_eng_name: (userType === "pm_pd" || userType === "hdec_eng") ? (displayName.trim() || null) : null,
+          add_to_roster: addRoster,
         },
       });
       toast.success("계정이 생성되었습니다", { description: `초기 비밀번호: ${tempPw}` });
@@ -748,9 +750,13 @@ function NewUserDialog({ onCreated, disabled = false }: { onCreated: () => void;
             </div>
           )}
           {(userType === "hdec" || userType === "pm_pd" || userType === "hdec_pic" || userType === "hdec_eng") && (
-            <div className="rounded-md border bg-muted/30 p-2 text-xs text-muted-foreground">
-              {(userType === "hdec" || userType === "hdec_pic") ? "HDEC PIC" : "HDEC ENG"} 명단에는 위 <b>이름</b> 필드 값이 자동으로 등록됩니다.
-            </div>
+            <label className="flex items-start gap-2 rounded-md border bg-muted/30 p-2 text-xs">
+              <input type="checkbox" className="mt-0.5" checked={addRoster} onChange={(e) => setAddRoster(e.target.checked)} />
+              <span>
+                {(userType === "hdec" || userType === "hdec_pic") ? "HDEC PIC" : "HDEC ENG"} 명부에 등록
+                <span className="block text-muted-foreground">위 <b>이름</b>으로 명부에 추가하고 이 계정과 연결합니다. 같은 이름이 이미 있으면 그 행에 연결합니다.</span>
+              </span>
+            </label>
           )}
           <div>
             <Label>임시 비밀번호</Label>

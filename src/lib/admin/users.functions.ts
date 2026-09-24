@@ -105,6 +105,7 @@ export const createAppUser = createServerFn({ method: "POST" })
     subsub_name?: string | null;
     hdec_pic_name?: string | null;
     hdec_eng_name?: string | null;
+    add_to_roster?: boolean;
   }) => input)
   .handler(async ({ data, context }) => {
     await assertStrictAdmin(context.supabase, context.userId);
@@ -159,6 +160,25 @@ export const createAppUser = createServerFn({ method: "POST" })
       if (data.hdec_eng_name !== undefined) patch.hdec_eng_name = data.hdec_eng_name;
       if (Object.keys(patch).length) {
         await supabaseAdmin.from("profiles").update(patch as any).eq("id", created.user.id);
+      }
+      // 명부 등록(기본 선택): HDEC PIC/ENG 계정을 명부에 추가하거나 같은 이름 행에 연결.
+      const isPic = data.user_type === "hdec_pic" || data.user_type === "hdec";
+      const isEng = data.user_type === "hdec_eng" || data.user_type === "pm_pd";
+      if (data.add_to_roster !== false && (isPic || isEng)) {
+        const table = isPic ? "hdec_pic_name_master" : "hdec_eng_name_master";
+        const admin = supabaseAdmin as any;
+        const { data: existing } = await admin
+          .from(table).select("id,linked_user_id").eq("name_norm", nameNorm).maybeSingle();
+        if (existing) {
+          if (!existing.linked_user_id) {
+            await admin.from(table).update({ linked_user_id: created.user.id, verified: true, is_active: true }).eq("id", existing.id);
+          }
+        } else {
+          const row: Record<string, any> = { name, is_active: true, verified: true, linked_user_id: created.user.id };
+          if (isPic && data.team) row.team_code = data.team;
+          const { error: rErr } = await admin.from(table).insert(row);
+          if (rErr) throw new Error(`계정은 생성되었으나 명부 등록 실패: ${rErr.message}`);
+        }
       }
     }
     return { id: created?.user?.id };
