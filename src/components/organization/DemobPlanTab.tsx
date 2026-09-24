@@ -42,12 +42,21 @@ export function DemobPlanTab() {
     queryKey: ["demob-plan"],
     staleTime: 300_000,
     queryFn: async () => {
-      const { data, error } = await (supabase as any).rpc("org_demob_plan");
+      const [{ data, error }, picQ] = await Promise.all([
+        (supabase as any).rpc("org_demob_plan"),
+        (supabase as any).from("profiles").select("name_norm,is_active").eq("user_type", "hdec_pic"),
+      ]);
       if (error) throw new Error(error.message);
+      if (picQ.error) throw new Error(picQ.error.message);
       if (!data || typeof data !== "object" || Array.isArray(data)) {
         throw new Error("org_demob_plan: 예상치 못한 응답 형식");
       }
-      return data as DemobPayload;
+      // Demob Plan 대상 = 활성 HDEC PIC 계정만.
+      const picSet = new Set(
+        ((picQ.data ?? []) as any[]).filter((p) => p.is_active !== false).map((p) => String(p.name_norm ?? "")),
+      );
+      const payload = data as DemobPayload;
+      return { ...payload, rows: (payload.rows ?? []).filter((r) => picSet.has(r.nn)) };
     },
   });
 
