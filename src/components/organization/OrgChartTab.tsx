@@ -38,12 +38,21 @@ export function OrgChartTab() {
     queryFn: async () => {
       const { data, error } = await (supabase as any)
         .from("hdec_pic_name_master")
-        .select("id,name,is_active,merged_into_id,duty_title,rank_title,rank_level,team_code,parent_pic_id,sort_order")
+        .select("id,name,is_active,merged_into_id,duty_title,rank_title,rank_level,team_code,parent_pic_id,sort_order,linked_user_id")
         .is("merged_into_id", null)
         .eq("is_active", true)
         .order("name");
       if (error) throw new Error(error.message);
-      return (data ?? []) as OrgPic[];
+      // 계정이 비활성화된 사용자는 조직도에서 제외(계정 미연결 명부 행은 유지).
+      const linkedIds = Array.from(new Set(((data ?? []) as any[]).map((p) => p.linked_user_id).filter(Boolean)));
+      let inactive = new Set<string>();
+      if (linkedIds.length) {
+        const { data: profs, error: pErr } = await (supabase as any)
+          .from("profiles").select("id,is_active").in("id", linkedIds);
+        if (pErr) throw new Error(pErr.message);
+        inactive = new Set(((profs ?? []) as any[]).filter((p) => p.is_active === false).map((p) => p.id));
+      }
+      return ((data ?? []) as any[]).filter((p) => !p.linked_user_id || !inactive.has(p.linked_user_id)) as OrgPic[];
     },
   });
 
