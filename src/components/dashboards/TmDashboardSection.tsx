@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { AbdKpiCard } from "@/components/abd/dashboard/AbdKpiRows";
 import { TmPlanVsActualCard } from "@/components/task-management/dashboard/TmPlanVsActualCard";
-import { useTmScurveData } from "@/hooks/useTmScurveData";
+import { useTmDashboardItems } from "@/hooks/useTmDashboardItems";
 import {
   resolveActualPct,
   resolveIsDelayed,
@@ -28,7 +28,7 @@ function useTmPlot(
   f: PdbTmFilters,
   labels: { others: string; unassigned: string },
 ) {
-  const q = useTmScurveData({
+  const q = useTmDashboardItems({
     asOfDate,
     plots: [plot],
     disciplines: f.disciplines,
