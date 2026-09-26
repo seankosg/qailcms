@@ -120,6 +120,7 @@ export function SnagProgressPage() {
   const teamsKey = [...teams].sort().join(",");
   const roomKey = [...roomGroups].sort().join(",");
   const groupKey = effectiveGroupBy.join(",");
+  const stagesKey = effectiveStages.join(",");
 
   const cellsQ = useQuery({
     queryKey: [
@@ -154,7 +155,7 @@ export function SnagProgressPage() {
   });
 
   const totalsQ = useQuery({
-    queryKey: ["snag-progress-totals", plot, teamsKey, roomKey, groupKey, asOfDate, planMode],
+    queryKey: ["snag-progress-totals", plot, teamsKey, roomKey, groupKey, stagesKey, asOfDate, planMode],
     queryFn: () =>
       totalsFn({
         data: {
@@ -164,6 +165,7 @@ export function SnagProgressPage() {
           groupBy: effectiveGroupBy,
           asOfDate,
           planMode,
+          stages: effectiveStages,
         },
       }),
     staleTime: 60_000,
@@ -174,7 +176,7 @@ export function SnagProgressPage() {
   // (하드코딩 날짜 제거 — 구간에서 파생)
   const cumIso = useMemo(() => addDays(rangeStart, -1), [rangeStart]);
   const totalsCumQ = useQuery({
-    queryKey: ["snag-progress-totals-cum", plot, teamsKey, roomKey, groupKey, planMode, cumIso],
+    queryKey: ["snag-progress-totals-cum", plot, teamsKey, roomKey, groupKey, stagesKey, planMode, cumIso],
     queryFn: () =>
       totalsFn({
         data: {
@@ -184,6 +186,7 @@ export function SnagProgressPage() {
           groupBy: effectiveGroupBy,
           asOfDate: cumIso,
           planMode,
+          stages: effectiveStages,
         },
       }),
     enabled: bucket === "day",
