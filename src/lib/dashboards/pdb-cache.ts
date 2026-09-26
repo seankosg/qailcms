@@ -10,6 +10,7 @@ import {
 /** PDB 화면이 쓰는 캐시 키 접두어 — 이 키들만 브라우저에 저장한다. */
 const PDB_KEY_PREFIXES = [
   "tm-rows-as-of",
+  "tm-dashboard-items",
   "task-settings",
   "abd-progress",
   "snag-kpi",
