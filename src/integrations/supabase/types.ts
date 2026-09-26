@@ -10651,6 +10651,7 @@ export type Database = {
         Args: { _d: string; _fallback: number; _task_raw_id: string }
         Returns: number
       }
+      tm_dashboard_items_json: { Args: { p_as_of: string }; Returns: Json }
       tm_edit_record_daily: {
         Args: { p_from: string; p_to: string }
         Returns: {
