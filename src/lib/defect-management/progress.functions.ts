@@ -10,6 +10,7 @@ const InputSchema = z.object({
   groupBy: z.array(z.string()).min(1),
   asOfDate: z.string(),
   planMode: z.enum(["baseline", "remaining"]).default("baseline"),
+  stages: z.array(z.enum(["start", "rectified", "pre_inspection", "dar_inspection", "closure", "ho"])).default([]),
 });
 
 const CellsInputSchema = InputSchema.extend({
@@ -36,6 +37,8 @@ export const getSnagProgressCells = createServerFn({ method: "POST" })
       _range_end: data.rangeEnd,
       _as_of_date: data.asOfDate,
       _plan_mode: data.planMode,
+      // 화면이 실제로 사용하는 단계만 판정·집계한다. 빈 배열은 기존 호출과 같은 전체 단계다.
+      _stages: data.stages.length ? data.stages : null,
       // 문서 단위 집계행(`all|...`)은 신버전 매트릭스에서만 사용한다(구 배포본 하위호환).
       _include_agg: data.includeAgg,
       // 화면이 실제로 표시하는 조합만 집계한다. 빈 배열은 구 호출과 같은 전체 조합이다.

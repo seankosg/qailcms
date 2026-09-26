@@ -106,7 +106,7 @@ export function useSnagScurveData(params: SnagScurveParams) {
   });
 
   const totalsQ = useQuery({
-    queryKey: ["snag-kpi-totals", plot, teamsKey, roomKey, buildingKey, groupBy, asOfDate, planMode],
+    queryKey: ["snag-kpi-totals", plot, teamsKey, roomKey, buildingKey, groupBy, stage, asOfDate, planMode],
     queryFn: () =>
       totalsFn({
         data: {
@@ -117,6 +117,7 @@ export function useSnagScurveData(params: SnagScurveParams) {
           groupBy: [groupBy],
           asOfDate,
           planMode,
+          stages: [stage],
         },
       }),
     staleTime: 10 * 60_000,
