@@ -18,6 +18,7 @@ const CellsInputSchema = InputSchema.extend({
   rangeEnd: z.string(),
   // 매트릭스는 합계행(`all|...`)이 필요하지만 차트는 필요 없다(서버 집계 생략 = 더 빠름).
   includeAgg: z.boolean().default(true),
+  aggStages: z.array(z.enum(["start", "rectified", "pre_inspection", "dar_inspection", "closure", "ho"])).default([]),
 });
 
 export const getSnagProgressCells = createServerFn({ method: "POST" })
@@ -37,6 +38,8 @@ export const getSnagProgressCells = createServerFn({ method: "POST" })
       _plan_mode: data.planMode,
       // 문서 단위 집계행(`all|...`)은 신버전 매트릭스에서만 사용한다(구 배포본 하위호환).
       _include_agg: data.includeAgg,
+      // 화면이 실제로 표시하는 조합만 집계한다. 빈 배열은 구 호출과 같은 전체 조합이다.
+      _agg_stages: data.aggStages.length ? data.aggStages : null,
     });
     if (error) throw new Error(error.message);
     if (!Array.isArray(payload)) throw new Error("defect_snag_progress_cells_json RPC contract mismatch");
