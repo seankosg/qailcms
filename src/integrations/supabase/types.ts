@@ -9589,6 +9589,7 @@ export type Database = {
           _range_end: string
           _range_start: string
           _round: string
+          _stages?: string[]
           _teams: string[]
         }
         Returns: Json
