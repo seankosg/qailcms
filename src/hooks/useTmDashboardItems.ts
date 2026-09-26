@@ -38,7 +38,10 @@ export function useTmDashboardItems(params: TmScurveParams) {
         p_as_of: asOfDate,
       });
       if (error) throw error;
-      return withSrvFields(Array.isArray(data) ? data : []);
+      if (data != null && !Array.isArray(data)) {
+        throw new Error("tm_dashboard_items_json RPC contract mismatch: expected jsonb array");
+      }
+      return (((data ?? []) as unknown[]) as TmAsOfRow[]).map((r) => withSrvFields(r));
     },
   });
 
