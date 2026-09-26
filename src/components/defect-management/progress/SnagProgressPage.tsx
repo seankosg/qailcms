@@ -146,6 +146,7 @@ export function SnagProgressPage() {
           rangeEnd: rpcEnd,
           asOfDate,
           planMode,
+          aggStages: effectiveStages,
         },
       }),
     staleTime: 60_000,
