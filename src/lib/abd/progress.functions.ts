@@ -6,6 +6,7 @@ const InputSchema = z.object({
   plots: z.array(z.string()).default([]),
   teams: z.array(z.string()).default([]),
   groupBy: z.array(z.string()).min(1),
+  stages: z.array(z.enum(["draft_start", "draft_finish", "submission", "dar", "approval"])).default([]),
   asOfDate: z.string(),
   planMode: z.enum(["baseline", "remaining"]).default("baseline"),
   round: z.enum(["R1", "R2", "R3", "all"]).default("all"),
@@ -36,6 +37,8 @@ export const getAbdProgressCum = createServerFn({ method: "POST" })
       _as_of_date: data.asOfDate,
       _plan_mode: data.planMode,
       _round: data.round,
+      // 화면에 표시하는 단계만 집계한다. 빈 배열은 기존 호출과 같은 전체 단계다.
+      _stages: data.stages.length ? data.stages : null,
     });
     if (error) throw new Error(error.message);
     const rows = Array.isArray(payload) ? payload : [];
