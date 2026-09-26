@@ -62,6 +62,8 @@ export function useAbdScurveData(params: AbdScurveParams) {
   const teamsKey = [...teams].sort().join(",");
   const groupKey = groupBy.join(",");
   const roundKey = round;
+  const effectiveStages = stages?.length ? stages : ALL_STAGES;
+  const stagesKey = effectiveStages.join(",");
   const plots = plot === "all" ? [] : [plot];
 
   const cellsQ = useQuery({
@@ -97,10 +99,10 @@ export function useAbdScurveData(params: AbdScurveParams) {
   });
 
   const totalsQ = useQuery({
-    queryKey: ["abd-progress-totals", plot, teamsKey, roundKey, groupKey, asOfDate, planMode],
+    queryKey: ["abd-progress-totals", plot, teamsKey, roundKey, groupKey, stagesKey, asOfDate, planMode],
     queryFn: () =>
       totalsFn({
-        data: { plots, teams, groupBy, asOfDate, planMode, round },
+        data: { plots, teams, groupBy, stages: effectiveStages, asOfDate, planMode, round },
       }),
     staleTime: 10 * 60_000,
     gcTime: 30 * 60_000,
@@ -111,10 +113,10 @@ export function useAbdScurveData(params: AbdScurveParams) {
 
   // S-Curve: 메인 cellsQ(전 라운드 통합) 재사용 + baseline totals 1회.
   const baselineQ = useQuery({
-    queryKey: ["abd-progress-totals-baseline", plot, teamsKey, groupKey, baselineAsOf, planMode],
+    queryKey: ["abd-progress-totals-baseline", plot, teamsKey, groupKey, stagesKey, baselineAsOf, planMode],
     queryFn: () =>
       totalsFn({
-        data: { plots, teams, groupBy, asOfDate: baselineAsOf, planMode, round },
+        data: { plots, teams, groupBy, stages: effectiveStages, asOfDate: baselineAsOf, planMode, round },
       }),
     staleTime: 10 * 60_000,
     gcTime: 30 * 60_000,
