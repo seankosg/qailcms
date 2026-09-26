@@ -9960,6 +9960,7 @@ export type Database = {
       }
       defect_snag_progress_cells: {
         Args: {
+          _agg_stages?: string[]
           _as_of_date: string
           _bucket: string
           _buildings?: string[]
@@ -9982,6 +9983,7 @@ export type Database = {
       }
       defect_snag_progress_cells_json: {
         Args: {
+          _agg_stages?: string[]
           _as_of_date: string
           _bucket: string
           _buildings?: string[]
