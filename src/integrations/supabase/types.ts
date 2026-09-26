@@ -9626,6 +9626,7 @@ export type Database = {
               _plan_mode: string
               _plots: string[]
               _round: string
+              _stages?: string[]
               _teams: string[]
             }
             Returns: {
@@ -9644,6 +9645,7 @@ export type Database = {
           _plan_mode: string
           _plots: string[]
           _round: string
+          _stages?: string[]
           _teams: string[]
         }
         Returns: Json
