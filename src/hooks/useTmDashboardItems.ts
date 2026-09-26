@@ -45,15 +45,12 @@ export function useTmDashboardItems(params: TmScurveParams) {
   const items = useMemo(() => {
     const rows = (q.data ?? []) as unknown as TaskItem[];
     return rows.filter((r) => {
-      if (disciplines?.length && !disciplines.includes(r.discipline)) return false;
-      if (plots?.length && !plots.includes(r.plot)) return false;
-      if (
-        hdecPic?.length &&
-        !hdecPic.includes((r as any).effective_pic ?? r.hdec_pic_name) &&
-        !hdecPic.includes(r.hdec_pic_name)
-      )
-        return false;
-      if (hdecEng?.length && !hdecEng.includes(r.hdec_eng_name)) return false;
+      if (disciplines?.length && !disciplines.includes(String(r.discipline ?? ""))) return false;
+      if (plots?.length && !plots.includes(String(r.plot ?? ""))) return false;
+      const pic = String((r as any).effective_pic ?? r.hdec_pic_name ?? "");
+      const picOrig = String(r.hdec_pic_name ?? "");
+      if (hdecPic?.length && !hdecPic.includes(pic) && !hdecPic.includes(picOrig)) return false;
+      if (hdecEng?.length && !hdecEng.includes(String(r.hdec_eng_name ?? ""))) return false;
       return true;
     });
   }, [q.data, disciplines, plots, hdecPic, hdecEng]);
